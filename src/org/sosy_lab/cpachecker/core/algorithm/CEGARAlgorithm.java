@@ -48,6 +48,7 @@ import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.algorithm.ParallelAlgorithm.ReachedSetUpdateListener;
 import org.sosy_lab.cpachecker.core.algorithm.ParallelAlgorithm.ReachedSetUpdater;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
+import org.sosy_lab.cpachecker.core.interfaces.AdvancedStatistics;
 import org.sosy_lab.cpachecker.core.interfaces.ConfigurableProgramAnalysis;
 import org.sosy_lab.cpachecker.core.interfaces.Refiner;
 import org.sosy_lab.cpachecker.core.interfaces.Statistics;
@@ -60,7 +61,7 @@ import org.sosy_lab.cpachecker.exceptions.RefinementFailedException;
 
 public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSetUpdater {
 
-  private static class CEGARStatistics implements Statistics {
+  private static class CEGARStatistics implements AdvancedStatistics {
 
     private final Timer totalTimer = new Timer();
     private final Timer refinementTimer = new Timer();
@@ -231,6 +232,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
     boolean refinedInPreviousIteration = false;
     stats.totalTimer.start();
+    stats.startTracking();
     try {
       boolean refinementSuccessful;
       do {
@@ -238,7 +240,9 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
         final AbstractState previousLastState = reached.getLastState();
 
         // run algorithm
+        stats.trackEvent("Start algorithm");
         status = status.update(algorithm.run(reached));
+        stats.trackEvent("Stop algorithm");
         notifyReachedSetUpdateListeners(reached);
 
         if (stats.countRefinements == maxRefinementNum) {
@@ -249,7 +253,9 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
         // if there is any target state do refinement
         if (refinementNecessary(reached, previousLastState)) {
+          stats.trackEvent("Start refinement");
           refinementSuccessful = refine(reached);
+          stats.trackEvent("Stop refinement");
           refinedInPreviousIteration = true;
           // Note, with special options reached set still contains violated properties
           // i.e (stopAfterError = true) or race conditions analysis
@@ -271,11 +277,13 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
     } finally {
       stats.totalTimer.stop();
+      stats.stopTracking();
     }
     return status;
   }
 
   private boolean refinementNecessary(ReachedSet reached, AbstractState previousLastState) {
+    stats.trackEvent("Evaluating necessity of refinement");
     if (globalRefinement) {
       // check other states
       return reached.hasViolatedProperties();
