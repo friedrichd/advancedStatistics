@@ -63,7 +63,6 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
   private static class CEGARStatistics implements AdvancedStatistics {
 
-    private final Timer totalTimer = new Timer();
     private final Timer refinementTimer = new Timer();
 
     @SuppressFBWarnings(value = "VO_VOLATILE_INCREMENT",
@@ -86,7 +85,6 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     public void printStatistics(PrintStream out, Result pResult, UnmodifiableReachedSet pReached) {
 
       out.println("Number of refinements:                " + countRefinements);
-
       if (countRefinements > 0) {
         out.println("Number of successful refinements:     " + countSuccessfulRefinements);
         out.println("Number of failed refinements:         " + countFailedRefinements);
@@ -95,7 +93,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
         out.println("Avg. size of reached set before ref.: " + div(totalReachedSizeBeforeRefinement, countRefinements));
         out.println("Avg. size of reached set after ref.:  " + div(totalReachedSizeAfterRefinement, countSuccessfulRefinements));
         out.println("");
-        out.println("Total time for CEGAR algorithm:   " + totalTimer);
+        out.println("Total time for CEGAR algorithm:   " + baseTimer);
         out.println("Time for refinements:             " + refinementTimer);
         out.println("Average time for refinement:      " + refinementTimer.getAvgTime().formatAs(TimeUnit.SECONDS));
         out.println("Max time for refinement:          " + refinementTimer.getMaxTime().formatAs(TimeUnit.SECONDS));
@@ -231,7 +229,6 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     AlgorithmStatus status = AlgorithmStatus.SOUND_AND_PRECISE;
 
     boolean refinedInPreviousIteration = false;
-    stats.totalTimer.start();
     stats.startTracking();
     try {
       boolean refinementSuccessful;
@@ -276,7 +273,6 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       } while (refinementSuccessful);
 
     } finally {
-      stats.totalTimer.stop();
       stats.stopTracking();
     }
     return status;
