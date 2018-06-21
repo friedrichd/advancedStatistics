@@ -235,7 +235,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
     boolean refinedInPreviousIteration = false;
     // stats.startTracking();
-    stats.test.startTracking();
+    stats.test.start();
     try {
       boolean refinementSuccessful;
       do {
@@ -243,9 +243,9 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
         final AbstractState previousLastState = reached.getLastState();
 
         // run algorithm
-        stats.test.trackEvent("Start algorithm");
+        stats.test.openEvent("Algorithm");
         status = status.update(algorithm.run(reached));
-        stats.test.trackEvent("Stop algorithm");
+        stats.test.closeEvent();
         notifyReachedSetUpdateListeners(reached);
 
         if (stats.countRefinements == maxRefinementNum) {
@@ -256,9 +256,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
         // if there is any target state do refinement
         if (refinementNecessary(reached, previousLastState)) {
-          stats.test.trackEvent("Start refinement");
           refinementSuccessful = refine(reached);
-          stats.test.trackEvent("Stop refinement");
           refinedInPreviousIteration = true;
           // Note, with special options reached set still contains violated properties
           // i.e (stopAfterError = true) or race conditions analysis
@@ -279,25 +277,27 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       } while (refinementSuccessful);
 
     } finally {
-      // stats.stopTracking();
-      stats.test.stopTracking();
+      stats.test.stop();
     }
     return status;
   }
 
   private boolean refinementNecessary(ReachedSet reached, AbstractState previousLastState) {
-    stats.test.trackEvent("Evaluating necessity of refinement");
+    stats.test.openEvent("Evaluating necessity of refinement");
+    boolean rValue;
     if (globalRefinement) {
       // check other states
-      return reached.hasViolatedProperties();
+      rValue = reached.hasViolatedProperties();
 
     } else {
       // Check only last state, but only if it is different from the last iteration.
       // Otherwise we would attempt to refine the same state twice if CEGARAlgorithm.run
       // is called again but this time the inner algorithm does not find any successor states.
-      return !Objects.equals(reached.getLastState(), previousLastState)
+      rValue = !Objects.equals(reached.getLastState(), previousLastState)
           && isTargetState(reached.getLastState());
     }
+    stats.test.closeEvent();
+    return rValue;
   }
 
   @SuppressWarnings("NonAtomicVolatileUpdate") // statistics written only by one thread
@@ -309,6 +309,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     sizeOfReachedSetBeforeRefinement = reached.size();
 
     stats.refinementTimer.start();
+    stats.test.openEvent("Refinement");
     boolean refinementResult;
     try {
       refinementResult = mRefiner.performRefinement(reached);
@@ -317,6 +318,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       stats.countFailedRefinements++;
       throw e;
     } finally {
+      stats.test.closeEvent();
       stats.refinementTimer.stop();
     }
 
