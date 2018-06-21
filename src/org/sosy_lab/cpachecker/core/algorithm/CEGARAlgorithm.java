@@ -48,7 +48,6 @@ import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.algorithm.ParallelAlgorithm.ReachedSetUpdateListener;
 import org.sosy_lab.cpachecker.core.algorithm.ParallelAlgorithm.ReachedSetUpdater;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
-import org.sosy_lab.cpachecker.core.interfaces.AdvancedStatistics;
 import org.sosy_lab.cpachecker.core.interfaces.ConfigurableProgramAnalysis;
 import org.sosy_lab.cpachecker.core.interfaces.Refiner;
 import org.sosy_lab.cpachecker.core.interfaces.Statistics;
@@ -58,11 +57,13 @@ import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
 import org.sosy_lab.cpachecker.cpa.value.refiner.UnsoundRefiner;
 import org.sosy_lab.cpachecker.exceptions.CPAException;
 import org.sosy_lab.cpachecker.exceptions.RefinementFailedException;
+import org.sosy_lab.cpachecker.util.statistics.StatTracker;
 
 public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSetUpdater {
 
-  private static class CEGARStatistics implements AdvancedStatistics {
+  private static class CEGARStatistics implements Statistics {
 
+    private final StatTracker test = new StatTracker("Test");
     private final Timer refinementTimer = new Timer();
 
     @SuppressFBWarnings(value = "VO_VOLATILE_INCREMENT",
@@ -75,6 +76,8 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     private int maxReachedSizeAfterRefinement = 0;
     private long totalReachedSizeBeforeRefinement = 0;
     private long totalReachedSizeAfterRefinement = 0;
+
+    // private StatHist reachedSizeBeforeRefinement = new StatHist("reached set before ref.");
 
     @Override
     public String getName() {
@@ -93,7 +96,9 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
         out.println("Avg. size of reached set before ref.: " + div(totalReachedSizeBeforeRefinement, countRefinements));
         out.println("Avg. size of reached set after ref.:  " + div(totalReachedSizeAfterRefinement, countSuccessfulRefinements));
         out.println("");
-        out.println("Total time for CEGAR algorithm:   " + baseTimer);
+        out.println(test);
+        out.println("");
+        // out.println("Total time for CEGAR algorithm: " + baseTimer);
         out.println("Time for refinements:             " + refinementTimer);
         out.println("Average time for refinement:      " + refinementTimer.getAvgTime().formatAs(TimeUnit.SECONDS));
         out.println("Max time for refinement:          " + refinementTimer.getMaxTime().formatAs(TimeUnit.SECONDS));
@@ -229,7 +234,8 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     AlgorithmStatus status = AlgorithmStatus.SOUND_AND_PRECISE;
 
     boolean refinedInPreviousIteration = false;
-    stats.startTracking();
+    // stats.startTracking();
+    stats.test.startTracking();
     try {
       boolean refinementSuccessful;
       do {
@@ -237,9 +243,9 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
         final AbstractState previousLastState = reached.getLastState();
 
         // run algorithm
-        stats.trackEvent("Start algorithm");
+        stats.test.trackEvent("Start algorithm");
         status = status.update(algorithm.run(reached));
-        stats.trackEvent("Stop algorithm");
+        stats.test.trackEvent("Stop algorithm");
         notifyReachedSetUpdateListeners(reached);
 
         if (stats.countRefinements == maxRefinementNum) {
@@ -250,9 +256,9 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
         // if there is any target state do refinement
         if (refinementNecessary(reached, previousLastState)) {
-          stats.trackEvent("Start refinement");
+          stats.test.trackEvent("Start refinement");
           refinementSuccessful = refine(reached);
-          stats.trackEvent("Stop refinement");
+          stats.test.trackEvent("Stop refinement");
           refinedInPreviousIteration = true;
           // Note, with special options reached set still contains violated properties
           // i.e (stopAfterError = true) or race conditions analysis
@@ -273,13 +279,14 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       } while (refinementSuccessful);
 
     } finally {
-      stats.stopTracking();
+      // stats.stopTracking();
+      stats.test.stopTracking();
     }
     return status;
   }
 
   private boolean refinementNecessary(ReachedSet reached, AbstractState previousLastState) {
-    stats.trackEvent("Evaluating necessity of refinement");
+    stats.test.trackEvent("Evaluating necessity of refinement");
     if (globalRefinement) {
       // check other states
       return reached.hasViolatedProperties();

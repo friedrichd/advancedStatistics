@@ -23,9 +23,6 @@
  */
 package org.sosy_lab.cpachecker.core.interfaces;
 
-import java.util.ArrayList;
-import java.util.List;
-import org.sosy_lab.common.time.TimeSpan;
 import org.sosy_lab.common.time.Timer;
 
 /**
@@ -37,22 +34,28 @@ import org.sosy_lab.common.time.Timer;
 public interface AdvancedStatistics extends Statistics {
 
   final Timer baseTimer = new Timer();
-  final List<TimeSpan> timestamps = new ArrayList<>();
-  final List<String> labels = new ArrayList<>();
+  // final List<StatisticEvent> trackedEvents = new ArrayList<>();
 
   public default void startTracking() {
-    baseTimer.start();
-    this.trackEvent("Start");
+    if (!baseTimer.isRunning()) {
+      baseTimer.start();
+      this.trackEvent("Start Tracking");
+    }
   }
 
   public default void stopTracking() {
-    this.trackEvent("Stop");
-    baseTimer.stopIfRunning();
+    if (baseTimer.isRunning()) {
+      this.trackEvent("Stop Tracking");
+      baseTimer.stop();
+    }
   }
 
   public default void trackEvent(String label) {
-    timestamps.add(baseTimer.getSumTime());
-    labels.add(label);
+    // trackedEvents.add(new StatisticEvent(baseTimer.getSumTime(), label));
   }
+
+  /*
+   * public default List<StatisticEvent> getEvents() { return trackedEvents; }
+   */
 
 }
