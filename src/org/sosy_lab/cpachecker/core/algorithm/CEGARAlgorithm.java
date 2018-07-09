@@ -87,6 +87,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
       out.println("Number of refinements:                " + countRefinements);
       if (countRefinements > 0) {
+        // Das erste ist Summe/Gesamtzeit!
         out.println("Number of successful refinements:     " + countSuccessfulRefinements);
         out.println("Number of failed refinements:         " + countFailedRefinements);
         out.println("Max. size of reached set before ref.: " + maxReachedSizeBeforeRefinement);
@@ -103,7 +104,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
   }
 
   private final CEGARStatistics stats = new CEGARStatistics();
-  private final AdvancedStatistics stats2 = new AdvancedStatistics("CEGAR2");
+  private final AdvancedStatistics stats2 = new AdvancedStatistics("CEGAR (advanced)");
 
   private final List<ReachedSetUpdateListener> reachedSetUpdateListeners =
       new CopyOnWriteArrayList<>();
@@ -240,9 +241,9 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
         final AbstractState previousLastState = reached.getLastState();
 
         // run algorithm
-        stats2.open("Algorithm");
+        stats2.open("Time for algorithm");
         status = status.update(algorithm.run(reached));
-        stats2.close("Algorithm");
+        stats2.close("Time for algorithm");
         notifyReachedSetUpdateListeners(reached);
 
         if (stats.countRefinements == maxRefinementNum) {
@@ -308,7 +309,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
     stats.refinementTimer.start();
 
-    stats2.track("Set before", reached.size());
+    stats2.track("Size of reached set before ref.", reached.size());
     stats2.open("Refinement");
     boolean refinementResult = false;
     try {
@@ -328,7 +329,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       stats.countSuccessfulRefinements++;
       stats.totalReachedSizeAfterRefinement += reached.size();
       stats.maxReachedSizeAfterRefinement = Math.max(stats.maxReachedSizeAfterRefinement, reached.size());
-      stats2.track("Set after", reached.size());
+      stats2.track("Size of reached set after ref.", reached.size());
     }
 
     return refinementResult;
@@ -336,6 +337,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
   @Override
   public void collectStatistics(Collection<Statistics> pStatsCollection) {
+    // String ändern vorsichtig!
     if (algorithm instanceof StatisticsProvider) {
       ((StatisticsProvider)algorithm).collectStatistics(pStatsCollection);
     }

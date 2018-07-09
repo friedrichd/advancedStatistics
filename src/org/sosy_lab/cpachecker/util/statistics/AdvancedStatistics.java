@@ -23,17 +23,21 @@
  */
 package org.sosy_lab.cpachecker.util.statistics;
 
-import com.google.common.base.Joiner;
 import com.google.common.base.Stopwatch;
 import java.io.PrintStream;
+import java.time.Duration;
 import java.util.ArrayDeque;
-import java.util.ArrayList;
 import java.util.Deque;
-import java.util.List;
+import java.util.HashMap;
+import java.util.Map;
 import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.interfaces.Statistics;
 import org.sosy_lab.cpachecker.core.interfaces.StatisticsProvider;
 import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
+import org.sosy_lab.cpachecker.util.statistics.storage.AbstractStatStorage;
+import org.sosy_lab.cpachecker.util.statistics.storage.NumberValueOnlyStorage;
+import org.sosy_lab.cpachecker.util.statistics.storage.TimeOnlyStorage;
+import org.sosy_lab.cpachecker.util.statistics.storage.ValueOnlyStorage;
 
 /**
  * A class to output statistics and results of an analysis in an advanced way.
@@ -43,35 +47,24 @@ import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
  */
 public class AdvancedStatistics implements Statistics {
 
-  private static final String LABEL_TOTALTIME = "Total";
+  private static final String LABEL_TOTALTIME = "Total time for ";
 
   private final String name;
   private final Stopwatch baseTime = Stopwatch.createUnstarted();
-  private Deque<StatEvent> openEvents = new ArrayDeque<>();
 
-  private final StorageStrategy storage;
+  private final AbstractStatStorage baseStorage;
+  private final Map<Long, Deque<StatEvent>> openEvents = new HashMap<>();
+
+  private int errors = 0;
+
+  // private final StorageStrategy storage;
+  // Tree of StorageStrat!
+  // Each Level may get an own type!
+  // Options/Type werden mitübergeben...
 
   public AdvancedStatistics(String name) {
     this.name = name;
-    this.storage = new StorageStrategy(){
-
-      List<StatEvent> events = new ArrayList<>();
-
-      @Override
-      public void store(StatEvent event) {
-        events.add(event);
-      }
-
-      @Override
-      public String getPrintableStatistics() {
-        return Joiner.on("\n").join(events);
-      }
-    };
-  }
-
-  public AdvancedStatistics(String name, StorageStrategy store) {
-    this.name = name;
-    this.storage = store;
+    this.baseStorage = new TimeOnlyStorage(LABEL_TOTALTIME + name);
   }
 
   @Override
@@ -80,51 +73,50 @@ public class AdvancedStatistics implements Statistics {
   }
 
   /**
-   * Starts the Timer to track events
+   * Starts the timer to track events
    */
-  public void startTracking() {
-    if (!baseTime.isRunning()) {
-      pushAndStore(new StatEvent(0, LABEL_TOTALTIME));
+  public synchronized void startTracking() {
+    if (!baseTime.isRunning() && baseTime.elapsed().isZero()) {
       baseTime.start();
     }
   }
 
   /**
-   * Stops the Timer to track events
+   * Stops the timer to track events
    */
-  public void stopTracking() {
+  public synchronized void stopTracking() {
     if (baseTime.isRunning()) {
-      while (!openEvents.isEmpty()) {
-        StatEvent e = openEvents.pop();
-        e.calcDuration(baseTime.elapsed().toNanos());
+      // count all unclosed events as errors
+      for (Deque<StatEvent> unclosedEvents : openEvents.values()) {
+        errors += unclosedEvents.size();
       }
+      openEvents.clear();
+
+      baseStorage.update(baseTime.elapsed());
       baseTime.stop();
     }
   }
 
   public void track(String label) {
-    storage.store(new StatEvent(baseTime.elapsed().toNanos(), label));
+    getCurrentStorage().getChild(label, ValueOnlyStorage.class);
   }
 
   public void track(String label, Object value) {
-    storage.store(new StatEvent(baseTime.elapsed().toNanos(), label, value));
+    if (value instanceof Number) {
+      getCurrentStorage().getChild(label, NumberValueOnlyStorage.class).update(value);
+    } else {
+      getCurrentStorage().getChild(label, ValueOnlyStorage.class).update(value);
+    }
   }
 
   public void open(String label) {
-    if(!label.equals(LABEL_TOTALTIME)){
-      pushAndStore(new StatEvent(baseTime.elapsed().toNanos(), label));
-    }
+    AbstractStatStorage current = getCurrentStorage().getChild(label, TimeOnlyStorage.class);
+    push(new StatEvent(baseTime.elapsed(), current));
   }
 
   public void open(String label, Object value) {
-    if(!label.equals(LABEL_TOTALTIME)){
-    pushAndStore(new StatEvent(baseTime.elapsed().toNanos(), label, value));
-    }
-  }
-
-  private void pushAndStore(StatEvent event) {
-    openEvents.push(event);
-    storage.store(event);
+    AbstractStatStorage current = getCurrentStorage().getChild(label, TimeOnlyStorage.class);
+    push(new StatEvent(baseTime.elapsed(), current, value));
   }
 
   /**
@@ -132,16 +124,22 @@ public class AdvancedStatistics implements Statistics {
    * reached (in negative order) Otherwise a new event will be tracked.
    */
   public void close(String label) {
-    if (openEvents.stream().anyMatch(e -> e.label.equals(label))) {
-      while (!openEvents.isEmpty()) {
-        StatEvent e = openEvents.pop();
-        e.calcDuration(baseTime.elapsed().toNanos());
-        if (e.label.equals(label)) {
+    long id = Thread.currentThread().getId();
+    if (openEvents.containsKey(id)
+        && !openEvents.get(id).isEmpty()
+        && openEvents.get(id).stream().anyMatch(e -> e.hasLabel(label))) {
+      // Remove events until the right one is reached
+      while (!openEvents.get(id).isEmpty()) {
+        StatEvent e = openEvents.get(id).pop();
+        if (e.hasLabel(label)) {
+          e.storage.update(baseTime.elapsed().minus(e.time), e.value);
           break;
+        } else {
+          errors++;
         }
       }
     } else {
-      track(label);
+      errors++;
     }
   }
 
@@ -150,76 +148,70 @@ public class AdvancedStatistics implements Statistics {
    * reached (in negative order) Otherwise a new event will be tracked.
    */
   public void close(String label, Object value) {
-    if (openEvents.stream().anyMatch(e -> e.label.equals(label))) {
-      while (!openEvents.isEmpty()) {
-        StatEvent e = openEvents.pop();
-        e.value = value;
-        e.calcDuration(baseTime.elapsed().toNanos());
-        if (e.label.equals(label)) {
+    long id = Thread.currentThread().getId();
+    if (openEvents.containsKey(id)
+        && !openEvents.get(id).isEmpty()
+        && openEvents.get(id).stream().anyMatch(e -> e.hasLabel(label))) {
+      // Remove events until the right one is reached
+      while (!openEvents.get(id).isEmpty()) {
+        StatEvent e = openEvents.get(id).pop();
+        if (e.hasLabel(label)) {
+          e.storage.update(baseTime.elapsed().minus(e.time), value);
           break;
+        } else {
+          errors++;
         }
       }
-    }else{
-      track(label, value);
+    } else {
+      errors++;
     }
   }
 
+  private void push(StatEvent event) {
+    long id = Thread.currentThread().getId();
+    if (!openEvents.containsKey(id)) {
+      openEvents.put(id, new ArrayDeque<StatEvent>());
+    }
+    openEvents.get(id).push(event);
+  }
+
+  private AbstractStatStorage getCurrentStorage() {
+    long id = Thread.currentThread().getId();
+    if (openEvents.containsKey(id) && !openEvents.get(id).isEmpty()) {
+      return openEvents.get(id).getFirst().storage;
+    }
+    return baseStorage;
+  }
 
   @Override
   public void printStatistics(PrintStream out, Result result, UnmodifiableReachedSet reached) {
-    out.println(storage.getPrintableStatistics());
+    baseStorage.printStatistics(out);
+    if (errors > 0) {
+      put(out, 0, "Defect StatEvents in " + name + " statistics", errors);
+    }
   }
 
   class StatEvent {
 
-    final long time;
-    private final String label;
+    final AbstractStatStorage storage;
+    final Duration time;
+    Object value;
 
-    private long duration = 0;
-    private Object value;
-
-    public StatEvent(long time, String label) {
+    public StatEvent(Duration time, AbstractStatStorage storage) {
       this.time = time;
-      this.label = label;
+      this.storage = storage;
     }
 
-    public StatEvent(long time, String label, Object value) {
+    public StatEvent(Duration time, AbstractStatStorage storage, Object value) {
       this.time = time;
-      this.label = label;
+      this.storage = storage;
       this.value = value;
     }
 
-    /**
-     * Calculates the duration of the event.
-     */
-    public void calcDuration(long end_time) {
-      this.duration = end_time - time;
+    public boolean hasLabel(String label) {
+      return storage.label.equals(label);
     }
 
-    @Override
-    public String toString() {
-      StringBuilder sb = new StringBuilder();
-      sb.append(time);
-
-      if (label != null && !label.isEmpty()) {
-        sb.append(" [" + label + "]");
-      }
-
-      sb.append(": ");
-      if (value != null) {
-        sb.append(value + ", ");
-      }
-      if (duration > 0) {
-        sb.append("duration=" + duration + ", ");
-      }
-      sb.delete(sb.length() - 2, sb.length());
-      return sb.toString();
-    }
-  }
-
-  interface StorageStrategy {
-    public void store(StatEvent event);
-    public String getPrintableStatistics();
   }
 
 }
