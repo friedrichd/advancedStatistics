@@ -52,15 +52,13 @@ public class AdvancedStatistics implements Statistics {
   private final String name;
   private final Stopwatch baseTime = Stopwatch.createUnstarted();
 
+  // root of the storage tree
   private final AbstractStatStorage baseStorage;
+  // contains the stack of open events for all threads
   private final Map<Long, Deque<StatEvent>> openEvents = new HashMap<>();
 
-  private int errors = 0;
-
-  // private final StorageStrategy storage;
-  // Tree of StorageStrat!
-  // Each Level may get an own type!
-  // Options/Type werden mitübergeben...
+  // counter for detected errors
+  private volatile int errors = 0;
 
   public AdvancedStatistics(String name) {
     this.name = name;
@@ -73,7 +71,8 @@ public class AdvancedStatistics implements Statistics {
   }
 
   /**
-   * Starts the timer to track events
+   * Starts the overall timer and enables the tracking of events.</br>
+   * <b>Notice:</b> Tracking can not be paused or restarted again!
    */
   public synchronized void startTracking() {
     if (!baseTime.isRunning() && baseTime.elapsed().isZero()) {
@@ -82,7 +81,8 @@ public class AdvancedStatistics implements Statistics {
   }
 
   /**
-   * Stops the timer to track events
+   * Disables the tracking of events and stops the overall timer.</br>
+   * <b>Notice:</b> Tracking can not be paused or restarted again!
    */
   public synchronized void stopTracking() {
     if (baseTime.isRunning()) {
@@ -97,11 +97,24 @@ public class AdvancedStatistics implements Statistics {
     }
   }
 
+  /**
+   * Tracks an event without duration or value.
+   *
+   * @param label representing the name of the event
+   */
   public void track(String label) {
+    assert baseTime.isRunning() : "Please start tracking before trying to track something!";
     getCurrentStorage().getChild(label, ValueOnlyStorage.class);
   }
 
+  /**
+   * Tracks an event without duration, but with some value.
+   *
+   * @param label The name of the event
+   * @param value An additional value for categorization of the event
+   */
   public void track(String label, Object value) {
+    assert baseTime.isRunning() : "Please start tracking before trying to track something!";
     if (value instanceof Number) {
       getCurrentStorage().getChild(label, NumberValueOnlyStorage.class).update(value);
     } else {
@@ -109,11 +122,24 @@ public class AdvancedStatistics implements Statistics {
     }
   }
 
+  /**
+   * Opens an event without value.</br>
+   * A value can be added either on opening, on closing or not at all.
+   *
+   * @param label The name of the event
+   */
   public void open(String label) {
+    assert baseTime.isRunning() : "Please start tracking before trying to open an event!";
     AbstractStatStorage current = getCurrentStorage().getChild(label, TimeOnlyStorage.class);
     push(new StatEvent(baseTime.elapsed(), current));
   }
 
+  /**
+   * Opens an event with value. A value can be added either on opening, on closing or not at all.
+   *
+   * @param label The name of the event
+   * @param value An additional value for categorization of the event
+   */
   public void open(String label, Object value) {
     AbstractStatStorage current = getCurrentStorage().getChild(label, TimeOnlyStorage.class);
     push(new StatEvent(baseTime.elapsed(), current, value));

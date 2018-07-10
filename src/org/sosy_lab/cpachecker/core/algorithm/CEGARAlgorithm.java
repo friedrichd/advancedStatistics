@@ -87,7 +87,6 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
       out.println("Number of refinements:                " + countRefinements);
       if (countRefinements > 0) {
-        // Das erste ist Summe/Gesamtzeit!
         out.println("Number of successful refinements:     " + countSuccessfulRefinements);
         out.println("Number of failed refinements:         " + countFailedRefinements);
         out.println("Max. size of reached set before ref.: " + maxReachedSizeBeforeRefinement);
@@ -337,7 +336,6 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
   @Override
   public void collectStatistics(Collection<Statistics> pStatsCollection) {
-    // String ändern vorsichtig!
     if (algorithm instanceof StatisticsProvider) {
       ((StatisticsProvider)algorithm).collectStatistics(pStatsCollection);
     }
