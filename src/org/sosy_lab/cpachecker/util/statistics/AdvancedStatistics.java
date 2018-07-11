@@ -267,7 +267,7 @@ public class AdvancedStatistics implements Statistics {
   /**
    * Handle on an event until it is closed.
    */
-  class StatEvent {
+  public class StatEvent {
 
     final AbstractStatStorage storage;
     final Duration time;
