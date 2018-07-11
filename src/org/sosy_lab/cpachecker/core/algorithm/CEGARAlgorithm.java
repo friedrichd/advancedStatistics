@@ -58,6 +58,7 @@ import org.sosy_lab.cpachecker.cpa.value.refiner.UnsoundRefiner;
 import org.sosy_lab.cpachecker.exceptions.CPAException;
 import org.sosy_lab.cpachecker.exceptions.RefinementFailedException;
 import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics;
+import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics.StatEvent;
 
 public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSetUpdater {
 
@@ -240,9 +241,9 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
         final AbstractState previousLastState = reached.getLastState();
 
         // run algorithm
-        stats2.open("Time for algorithm");
+        StatEvent stat_algo = stats2.open("Algorithm");
         status = status.update(algorithm.run(reached));
-        stats2.close("Time for algorithm");
+        stats2.close(stat_algo);
         notifyReachedSetUpdateListeners(reached);
 
         if (stats.countRefinements == maxRefinementNum) {
@@ -281,7 +282,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
   }
 
   private boolean refinementNecessary(ReachedSet reached, AbstractState previousLastState) {
-    stats2.open("Evaluating necessity of refinement");
+    StatEvent stat_eval = stats2.open("Evaluating necessity of refinement");
     boolean rValue;
     if (globalRefinement) {
       // check other states
@@ -294,7 +295,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       rValue = !Objects.equals(reached.getLastState(), previousLastState)
           && isTargetState(reached.getLastState());
     }
-    stats2.close("Evaluating necessity of refinement", rValue);
+    stats2.close(stat_eval, rValue);
     return rValue;
   }
 
@@ -309,7 +310,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     stats.refinementTimer.start();
 
     stats2.track("Size of reached set before ref.", reached.size());
-    stats2.open("Refinement");
+    StatEvent stat_refine = stats2.open("Refinement");
     boolean refinementResult = false;
     try {
       refinementResult = mRefiner.performRefinement(reached);
@@ -318,7 +319,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       stats.countFailedRefinements++;
       throw e;
     } finally {
-      stats2.close("Refinement", refinementResult);
+      stats2.close(stat_refine, refinementResult);
       stats.refinementTimer.stop();
     }
 
