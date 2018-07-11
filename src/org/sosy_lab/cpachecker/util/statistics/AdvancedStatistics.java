@@ -104,7 +104,7 @@ public class AdvancedStatistics implements Statistics {
    */
   public void track(String label) {
     assert baseTime.isRunning() : "Please start tracking before trying to track something!";
-    getCurrentStorage().getChild(label, ValueOnlyStorage.class);
+    getCurrentStorage().getChildOrDefault(label, ValueOnlyStorage.class);
   }
 
   /**
@@ -116,9 +116,9 @@ public class AdvancedStatistics implements Statistics {
   public void track(String label, Object value) {
     assert baseTime.isRunning() : "Please start tracking before trying to track something!";
     if (value instanceof Number) {
-      getCurrentStorage().getChild(label, NumberValueOnlyStorage.class).update(value);
+      getCurrentStorage().getChildOrDefault(label, NumberValueOnlyStorage.class).update(value);
     } else {
-      getCurrentStorage().getChild(label, ValueOnlyStorage.class).update(value);
+      getCurrentStorage().getChildOrDefault(label, ValueOnlyStorage.class).update(value);
     }
   }
 
@@ -130,7 +130,8 @@ public class AdvancedStatistics implements Statistics {
    */
   public void open(String label) {
     assert baseTime.isRunning() : "Please start tracking before trying to open an event!";
-    AbstractStatStorage current = getCurrentStorage().getChild(label, TimeOnlyStorage.class);
+    AbstractStatStorage current =
+        getCurrentStorage().getChildOrDefault(label, TimeOnlyStorage.class);
     push(new StatEvent(baseTime.elapsed(), current));
   }
 
@@ -141,7 +142,8 @@ public class AdvancedStatistics implements Statistics {
    * @param value An additional value for categorization of the event
    */
   public void open(String label, Object value) {
-    AbstractStatStorage current = getCurrentStorage().getChild(label, TimeOnlyStorage.class);
+    AbstractStatStorage current =
+        getCurrentStorage().getChildOrDefault(label, TimeOnlyStorage.class);
     push(new StatEvent(baseTime.elapsed(), current, value));
   }
 

@@ -25,28 +25,21 @@ package org.sosy_lab.cpachecker.util.statistics.storage;
 
 import java.io.PrintStream;
 import java.time.Duration;
-import java.util.ArrayList;
 import java.util.Collections;
-import java.util.List;
+import java.util.LinkedHashMap;
+import java.util.Map;
 import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
 
 public abstract class AbstractStatStorage {
 
   public final String label;
-  private final List<AbstractStatStorage> children =
-      Collections.synchronizedList(new ArrayList<>());
+  private final Map<String, AbstractStatStorage> children =
+      Collections.synchronizedMap(new LinkedHashMap<>());
 
   public AbstractStatStorage(String label) {
     this.label = label;
   }
 
-  public AbstractStatStorage getChild(String label, Class<? extends AbstractStatStorage> c) {
-    synchronized (children) {
-      for (AbstractStatStorage child : children) {
-        if (child.label.equals(label)) {
-          return child;
-        }
-      }
   /**
    * Finds a sub-storage (child) by name or creates a new sub-storage, if the name doesn't exist.
    *
@@ -55,9 +48,14 @@ public abstract class AbstractStatStorage {
    *        {@link java.lang.String String} )
    * @return The (new) sub-storage
    */
+  public AbstractStatStorage
+      getChildOrDefault(String label, Class<? extends AbstractStatStorage> c) {
+    if (children.containsKey(label)) {
+      return children.get(label);
+    } else {
       try {
         AbstractStatStorage newChild = c.getDeclaredConstructor(String.class).newInstance(label);
-        children.add(newChild);
+        children.put(label, newChild);
         return newChild;
       } catch (Exception e) {
         return null;
@@ -109,7 +107,7 @@ public abstract class AbstractStatStorage {
   public void printStatistics(PrintStream out, int level) {
     StatisticsUtils.write(out, level, 50, adaptLabel(label), getPrintableStatistics());
     synchronized (children) {
-      for (AbstractStatStorage child : children) {
+      for (AbstractStatStorage child : children.values()) {
         child.printStatistics(out, level + 1);
       }
     }
