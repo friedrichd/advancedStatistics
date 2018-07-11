@@ -47,6 +47,14 @@ public abstract class AbstractStatStorage {
           return child;
         }
       }
+  /**
+   * Finds a sub-storage (child) by name or creates a new sub-storage, if the name doesn't exist.
+   *
+   * @param label The name of the sub-storage
+   * @param c The type of the new sub-storage (must have a constructor with parameter
+   *        {@link java.lang.String String} )
+   * @return The (new) sub-storage
+   */
       try {
         AbstractStatStorage newChild = c.getDeclaredConstructor(String.class).newInstance(label);
         children.add(newChild);
@@ -57,21 +65,48 @@ public abstract class AbstractStatStorage {
     }
   }
 
+  /**
+   * Updates the storage with a new event without additional value.
+   *
+   * @param duration The duration of the event
+   */
   public void update(Duration duration) {
     update(duration, null);
   }
 
+  /**
+   * Updates the storage with a new event without duration.
+   *
+   * @param value An additional value of the event for categorization
+   */
   public void update(Object value) {
     update(Duration.ZERO, value);
   }
 
+  /**
+   * Updates the storage with a new event.
+   *
+   * @param duration The duration of the event
+   * @param value An additional value of the event for categorization
+   */
   public abstract void update(Duration duration, Object value);
 
+  /**
+   * Prints the statistics storage with all sub-storages.
+   *
+   * @param out The output stream
+   */
   public void printStatistics(PrintStream out) {
     printStatistics(out, 0);
   }
 
-  private void printStatistics(PrintStream out, int level) {
+  /**
+   * Prints the statistics storage with all sub-storages.
+   *
+   * @param out The output stream
+   * @param level The amount of space in front of every line
+   */
+  public void printStatistics(PrintStream out, int level) {
     StatisticsUtils.write(out, level, 50, adaptLabel(label), getPrintableStatistics());
     synchronized (children) {
       for (AbstractStatStorage child : children) {
@@ -80,10 +115,18 @@ public abstract class AbstractStatStorage {
     }
   }
 
+  /**
+   * All sub-classes may overwrite this method to customize the label, for example with prefixes.
+   *
+   * @param label The original name of the storage
+   */
   protected String adaptLabel(String label) {
     return label;
   }
 
+  /**
+   * Returns the value of the storage unit in a nice, printable way.
+   */
   protected abstract String getPrintableStatistics();
 
 }
