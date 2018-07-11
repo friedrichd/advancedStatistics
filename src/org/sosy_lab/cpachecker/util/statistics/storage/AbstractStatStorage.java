@@ -64,6 +64,13 @@ public abstract class AbstractStatStorage {
   }
 
   /**
+   * Updates the storage with a new event without duration or additional value.
+   */
+  public void update() {
+    update(Duration.ZERO, null);
+  }
+
+  /**
    * Updates the storage with a new event without additional value.
    *
    * @param duration The duration of the event

@@ -30,6 +30,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.function.Predicate;
 import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.interfaces.Statistics;
 import org.sosy_lab.cpachecker.core.interfaces.StatisticsProvider;
@@ -104,7 +105,7 @@ public class AdvancedStatistics implements Statistics {
    */
   public void track(String label) {
     assert baseTime.isRunning() : "Please start tracking before trying to track something!";
-    getCurrentStorage().getChildOrDefault(label, ValueOnlyStorage.class);
+    getCurrentStorage().getChildOrDefault(label, ValueOnlyStorage.class).update();
   }
 
   /**
@@ -128,11 +129,11 @@ public class AdvancedStatistics implements Statistics {
    *
    * @param label The name of the event
    */
-  public void open(String label) {
+  public StatEvent open(String label) {
     assert baseTime.isRunning() : "Please start tracking before trying to open an event!";
     AbstractStatStorage current =
         getCurrentStorage().getChildOrDefault(label, TimeOnlyStorage.class);
-    push(new StatEvent(baseTime.elapsed(), current));
+    return push(new StatEvent(baseTime.elapsed(), current));
   }
 
   /**
@@ -141,66 +142,110 @@ public class AdvancedStatistics implements Statistics {
    * @param label The name of the event
    * @param value An additional value for categorization of the event
    */
-  public void open(String label, Object value) {
+  public StatEvent open(String label, Object value) {
+    assert baseTime.isRunning() : "Please start tracking before trying to open an event!";
     AbstractStatStorage current =
         getCurrentStorage().getChildOrDefault(label, TimeOnlyStorage.class);
-    push(new StatEvent(baseTime.elapsed(), current, value));
+    return push(new StatEvent(baseTime.elapsed(), current, value));
   }
 
   /**
-   * If an open event with the same label exists, all open events are closed until this one is
-   * reached (in negative order) Otherwise a new event will be tracked.
+   * Closes the last open event with the same label.</br>
+   * <b>Notice:</b> Some behavior is not considered reasonable and will increment the error count:
+   * <ul>
+   * <li>Closing an event, that has not been opened or was already closed</li>
+   * <li>Not closing another event, that has been opened after opening this event</li>
+   * </ul>
+   *
+   * @param label The name of the event
    */
   public void close(String label) {
-    long id = Thread.currentThread().getId();
-    if (openEvents.containsKey(id)
-        && !openEvents.get(id).isEmpty()
-        && openEvents.get(id).stream().anyMatch(e -> e.hasLabel(label))) {
-      // Remove events until the right one is reached
-      while (!openEvents.get(id).isEmpty()) {
-        StatEvent e = openEvents.get(id).pop();
-        if (e.hasLabel(label)) {
-          e.storage.update(baseTime.elapsed().minus(e.time), e.value);
-          break;
-        } else {
-          errors++;
-        }
-      }
-    } else {
-      errors++;
+    StatEvent stored_event = pop(e -> e.hasLabel(label));
+    if (stored_event != null) {
+      stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), stored_event.value);
     }
   }
 
   /**
-   * If an open event with the same label exists, all open events are closed until this one is
-   * reached (in negative order) Otherwise a new event will be tracked.
+   * Closes the event.</br>
+   * <b>Notice:</b> Some behavior is not considered reasonable and will increment the error count:
+   * <ul>
+   * <li>Closing an event, that has not been opened or was already closed</li>
+   * <li>Not closing another event, that has been opened after opening this event</li>
+   * </ul>
+   *
+   * @param event The handle on the event
    */
-  public void close(String label, Object value) {
-    long id = Thread.currentThread().getId();
-    if (openEvents.containsKey(id)
-        && !openEvents.get(id).isEmpty()
-        && openEvents.get(id).stream().anyMatch(e -> e.hasLabel(label))) {
-      // Remove events until the right one is reached
-      while (!openEvents.get(id).isEmpty()) {
-        StatEvent e = openEvents.get(id).pop();
-        if (e.hasLabel(label)) {
-          e.storage.update(baseTime.elapsed().minus(e.time), value);
-          break;
-        } else {
-          errors++;
-        }
-      }
-    } else {
-      errors++;
+  public void close(StatEvent event) {
+    StatEvent stored_event = pop(e -> e.equals(event));
+    if (stored_event != null) {
+      stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), stored_event.value);
     }
   }
 
-  private void push(StatEvent event) {
+  /**
+   * Closes the last open event with the same label.</br>
+   * <b>Notice:</b> Some behavior is not considered reasonable and will increment the error count:
+   * <ul>
+   * <li>Closing an event, that has not been opened or was already closed</li>
+   * <li>Not closing another event, that has been opened after opening this event</li>
+   * </ul>
+   *
+   * @param label The name of the event
+   * @param value An additional value for categorization of the event
+   */
+  public void close(String label, Object value) {
+    StatEvent stored_event = pop(e -> e.hasLabel(label));
+    if (stored_event != null) {
+      stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), value);
+    }
+  }
+
+  /**
+   * Closes the event.</br>
+   * <b>Notice:</b> Some behavior is not considered reasonable and will increment the error count:
+   * <ul>
+   * <li>Closing an event, that has not been opened or was already closed</li>
+   * <li>Not closing another event, that has been opened after opening this event</li>
+   * </ul>
+   *
+   * @param event The handle on the event
+   * @param value An additional value for categorization of the event
+   */
+  public void close(StatEvent event, Object value) {
+    StatEvent stored_event = pop(e -> e.equals(event));
+    if (stored_event != null) {
+      stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), value);
+    }
+  }
+
+  private StatEvent push(StatEvent event) {
     long id = Thread.currentThread().getId();
     if (!openEvents.containsKey(id)) {
       openEvents.put(id, new ArrayDeque<StatEvent>());
     }
     openEvents.get(id).push(event);
+    return event;
+  }
+
+  private StatEvent pop(Predicate<StatEvent> pred) {
+    long id = Thread.currentThread().getId();
+    if (openEvents.containsKey(id)
+        && !openEvents.get(id).isEmpty()
+        && openEvents.get(id).stream().anyMatch(pred)) {
+      // Remove events until the right one is reached
+      while (!openEvents.get(id).isEmpty()) {
+        StatEvent e = openEvents.get(id).pop();
+        if (pred.test(e)) {
+          return e;
+        } else {
+          errors++;
+        }
+      }
+    } else {
+      errors++;
+    }
+    return null;
   }
 
   private AbstractStatStorage getCurrentStorage() {
@@ -219,6 +264,9 @@ public class AdvancedStatistics implements Statistics {
     }
   }
 
+  /**
+   * Handle on an event until it is closed.
+   */
   class StatEvent {
 
     final AbstractStatStorage storage;
