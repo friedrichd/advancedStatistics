@@ -30,12 +30,16 @@ import org.sosy_lab.cpachecker.cpa.smg.SMGInconsistentException;
 import org.sosy_lab.cpachecker.cpa.smg.SMGState;
 import org.sosy_lab.cpachecker.cpa.smg.SMGTargetSpecifier;
 import org.sosy_lab.cpachecker.cpa.smg.SMGUtils;
+import org.sosy_lab.cpachecker.cpa.smg.UnmodifiableSMGState;
 import org.sosy_lab.cpachecker.cpa.smg.graphs.CLangSMG;
 import org.sosy_lab.cpachecker.cpa.smg.graphs.edge.SMGEdgeHasValue;
 import org.sosy_lab.cpachecker.cpa.smg.graphs.edge.SMGEdgeHasValueFilter;
 import org.sosy_lab.cpachecker.cpa.smg.graphs.edge.SMGEdgePointsTo;
+import org.sosy_lab.cpachecker.cpa.smg.graphs.edge.SMGEdgePointsToFilter;
 import org.sosy_lab.cpachecker.cpa.smg.graphs.object.SMGAbstractListCandidateSequence;
 import org.sosy_lab.cpachecker.cpa.smg.graphs.object.SMGObject;
+import org.sosy_lab.cpachecker.cpa.smg.graphs.value.SMGKnownSymValue;
+import org.sosy_lab.cpachecker.cpa.smg.graphs.value.SMGValue;
 import org.sosy_lab.cpachecker.cpa.smg.join.SMGJoinStatus;
 import org.sosy_lab.cpachecker.cpa.smg.join.SMGJoinSubSMGsForAbstraction;
 import org.sosy_lab.cpachecker.cpa.smg.refiner.SMGMemoryPath;
@@ -66,8 +70,8 @@ public class SMGSingleLinkedListCandidateSequence extends SMGAbstractListCandida
 
       if (length > 1) {
         SMGJoinSubSMGsForAbstraction jointest =
-            new SMGJoinSubSMGsForAbstraction(new CLangSMG(pSMG), prevObject, nextObject, candidate,
-                pSmgState);
+            new SMGJoinSubSMGsForAbstraction(
+                pSMG.copyOf(), prevObject, nextObject, candidate, pSmgState);
 
         if (!jointest.isDefined()) {
           return pSMG;
@@ -82,6 +86,13 @@ public class SMGSingleLinkedListCandidateSequence extends SMGAbstractListCandida
       }
 
       SMGObject newAbsObj = join.getNewAbstractObject();
+
+      SMGEdgePointsToFilter pteFilter = SMGEdgePointsToFilter.targetObjectFilter(prevObject);
+      if (prevObject.isAbstract()) {
+        pteFilter = pteFilter.filterByTargetSpecifier(SMGTargetSpecifier.FIRST);
+      }
+      SMGValue val1 = Iterables.getOnlyElement(pSMG.getPtEdges(pteFilter)).getValue();
+      pSMG.replaceValue(SMGKnownSymValue.of(), val1);
 
       for (SMGEdgePointsTo pte : SMGUtils.getPointerToThisObject(nextObject, pSMG)) {
         pSMG.removePointsToEdge(pte.getValue());
@@ -123,8 +134,8 @@ public class SMGSingleLinkedListCandidateSequence extends SMGAbstractListCandida
   }
 
   @Override
-  public SMGAbstractionBlock createAbstractionBlock(SMGState pSmgState) {
-    Map<SMGObject, SMGMemoryPath> map = pSmgState.getHeapObjectMemoryPaths();
+  public SMGAbstractionBlock createAbstractionBlock(UnmodifiableSMGState pSmgState) {
+    Map<SMGObject, SMGMemoryPath> map = pSmgState.getHeap().getHeapObjectMemoryPaths();
     SMGMemoryPath pPointerToStartObject = map.get(candidate.getStartObject());
     return new SMGSingleLinkedListCandidateSequenceBlock(candidate.getShape(), length,
         pPointerToStartObject);

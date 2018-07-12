@@ -69,7 +69,8 @@ import org.sosy_lab.cpachecker.cpa.arg.path.PathIterator;
 import org.sosy_lab.cpachecker.cpa.smg.graphs.edge.SMGEdgeHasValue;
 import org.sosy_lab.cpachecker.cpa.smg.graphs.edge.SMGEdgePointsTo;
 import org.sosy_lab.cpachecker.cpa.smg.graphs.object.SMGObject;
-import org.sosy_lab.cpachecker.cpa.smg.graphs.value.SMGKnownSymValue;
+import org.sosy_lab.cpachecker.cpa.smg.graphs.value.SMGKnownSymbolicValue;
+import org.sosy_lab.cpachecker.exceptions.NoException;
 import org.sosy_lab.cpachecker.util.AbstractStates;
 import org.sosy_lab.cpachecker.util.Pair;
 
@@ -234,7 +235,7 @@ public class SMGConcreteErrorPathAllocator {
    * assigned, may not be part of the Left Hand Side we want to know the value of.
    *
    */
-  private static class ValueKnownVisitor extends DefaultCExpressionVisitor<Boolean, RuntimeException> {
+  private static class ValueKnownVisitor extends DefaultCExpressionVisitor<Boolean, NoException> {
 
     private final Set<CLeftHandSide> alreadyAssigned;
 
@@ -310,26 +311,24 @@ public class SMGConcreteErrorPathAllocator {
   private Map<Address, Object> createHeapValues(SMGState pSMGState,
       SMGObjectAddressMap pAdresses) {
 
-    Set<SMGEdgeHasValue> symbolicValues = pSMGState.getHVEdges();
+    Set<SMGEdgeHasValue> symbolicValues = pSMGState.getHeap().getHVEdges();
 
     Map<Address, Object> result = new HashMap<>();
 
     for (SMGEdgeHasValue hvEdge : ImmutableSet.copyOf(symbolicValues)) {
 
-      int symbolicValue = hvEdge.getValue();
+      SMGKnownSymbolicValue symbolicValue = (SMGKnownSymbolicValue) hvEdge.getValue();
       BigInteger value = null;
 
-      if (symbolicValue == 0) {
+      if (symbolicValue.isZero()) {
         value = BigInteger.ZERO;
-      } else if (pSMGState.isPointer(symbolicValue)) {
-        SMGEdgePointsTo pointer = pSMGState.getPointsToEdge(symbolicValue);
+      } else if (pSMGState.getHeap().isPointer(symbolicValue)) {
+        SMGEdgePointsTo pointer = pSMGState.getHeap().getPointer(symbolicValue);
 
         //TODO ugly, use common representation
         value = pAdresses.calculateAddress(pointer.getObject(), pointer.getOffset(), pSMGState).getAddressValue();
       } else if (pSMGState.isExplicit(symbolicValue)) {
-        value =
-            BigInteger.valueOf(
-                pSMGState.getExplicit(SMGKnownSymValue.valueOf(symbolicValue)).getAsLong());
+        value = BigInteger.valueOf(pSMGState.getExplicit(symbolicValue).getAsLong());
       } else {
         continue;
       }
@@ -343,9 +342,9 @@ public class SMGConcreteErrorPathAllocator {
 
   private static class SMGObjectAddressMap {
 
-    private Map<SMGObject, Address> objectAddressMap = new HashMap<>();
+    private final Map<SMGObject, Address> objectAddressMap = new HashMap<>();
     private Address nextAlloc = Address.valueOf(BigInteger.valueOf(100));
-    private Map<LeftHandSide, Address> variableAddressMap = new HashMap<>();
+    private final Map<LeftHandSide, Address> variableAddressMap = new HashMap<>();
 
     public Address calculateAddress(SMGObject pObject, long pOffset,
         SMGState pSMGState) {
@@ -353,7 +352,7 @@ public class SMGConcreteErrorPathAllocator {
       // Create a new base address for the object if necessary
       if (!objectAddressMap.containsKey(pObject)) {
         objectAddressMap.put(pObject, nextAlloc);
-        IDExpression lhs = pSMGState.createIDExpression(pObject);
+        IDExpression lhs = pSMGState.getHeap().createIDExpression(pObject);
         if (lhs != null) {
           variableAddressMap.put(lhs, nextAlloc);
         }

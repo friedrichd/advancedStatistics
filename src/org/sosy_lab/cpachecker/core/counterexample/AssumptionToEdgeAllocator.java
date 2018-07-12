@@ -119,7 +119,8 @@ import org.sosy_lab.cpachecker.core.defaults.ForwardingTransferRelation;
 import org.sosy_lab.cpachecker.cpa.value.AbstractExpressionValueVisitor;
 import org.sosy_lab.cpachecker.cpa.value.type.NumericValue;
 import org.sosy_lab.cpachecker.cpa.value.type.Value;
-import org.sosy_lab.cpachecker.exceptions.UnrecognizedCCodeException;
+import org.sosy_lab.cpachecker.exceptions.NoException;
+import org.sosy_lab.cpachecker.exceptions.UnrecognizedCodeException;
 import org.sosy_lab.cpachecker.util.Pair;
 import org.sosy_lab.cpachecker.util.automaton.AutomatonGraphmlCommon;
 
@@ -689,7 +690,7 @@ public class AssumptionToEdgeAllocator {
     }
   }
 
-  private class LModelValueVisitor implements CLeftHandSideVisitor<Object, RuntimeException> {
+  private class LModelValueVisitor implements CLeftHandSideVisitor<Object, NoException> {
 
     private final String functionName;
     private final AddressValueVisitor addressVisitor;
@@ -717,7 +718,7 @@ public class AssumptionToEdgeAllocator {
             "could not be correctly evaluated while calculating the concrete values "
             + "in the counterexample path.");
         return null;
-      } catch (UnrecognizedCCodeException e1) {
+      } catch (UnrecognizedCodeException e1) {
         throw new IllegalArgumentException(e1);
       }
 
@@ -927,7 +928,7 @@ public class AssumptionToEdgeAllocator {
       return false;
     }
 
-    private class AddressValueVisitor implements CLeftHandSideVisitor<Address, RuntimeException> {
+    private class AddressValueVisitor implements CLeftHandSideVisitor<Address, NoException> {
 
       private final LModelValueVisitor valueVisitor;
 
@@ -1050,7 +1051,7 @@ public class AssumptionToEdgeAllocator {
       }
 
       @Override
-      public Value visit(CCastExpression cast) throws UnrecognizedCCodeException {
+      public Value visit(CCastExpression cast) throws UnrecognizedCodeException {
 
         if (concreteState.getAnalysisConcreteExpressionEvaluation().shouldEvaluateExpressionWithThisEvaluator(cast)) {
           Value op = cast.getOperand().accept(this);
@@ -1066,7 +1067,7 @@ public class AssumptionToEdgeAllocator {
       }
 
       @Override
-      public Value visit(CBinaryExpression binaryExp) throws UnrecognizedCCodeException {
+      public Value visit(CBinaryExpression binaryExp) throws UnrecognizedCodeException {
 
         if (concreteState.getAnalysisConcreteExpressionEvaluation().shouldEvaluateExpressionWithThisEvaluator(binaryExp)) {
           Value op1 = binaryExp.getOperand1().accept(this);
@@ -1179,7 +1180,7 @@ public class AssumptionToEdgeAllocator {
             if (lVarIsAddress) {
               return new NumericValue(addressValue.subtract(pointerOffsetValue));
             } else {
-              throw new UnrecognizedCCodeException("Expected pointer arithmetic "
+              throw new UnrecognizedCodeException("Expected pointer arithmetic "
                   + " with + or - but found " + binaryExp.toASTString(), binaryExp);
             }
           default:
@@ -1193,7 +1194,7 @@ public class AssumptionToEdgeAllocator {
       }
 
       @Override
-      public Value visit(CUnaryExpression pUnaryExpression) throws UnrecognizedCCodeException {
+      public Value visit(CUnaryExpression pUnaryExpression) throws UnrecognizedCodeException {
 
         if (concreteState.getAnalysisConcreteExpressionEvaluation().shouldEvaluateExpressionWithThisEvaluator(pUnaryExpression)) {
 
@@ -1234,7 +1235,7 @@ public class AssumptionToEdgeAllocator {
 
       @Override
       protected Value evaluateCPointerExpression(CPointerExpression pCPointerExpression)
-          throws UnrecognizedCCodeException {
+          throws UnrecognizedCodeException {
         Object value = LModelValueVisitor.this.visit(pCPointerExpression);
 
         if (value == null || !(value instanceof Number)) {
@@ -1245,7 +1246,8 @@ public class AssumptionToEdgeAllocator {
       }
 
       @Override
-      protected Value evaluateCIdExpression(CIdExpression pCIdExpression) throws UnrecognizedCCodeException {
+      protected Value evaluateCIdExpression(CIdExpression pCIdExpression)
+          throws UnrecognizedCodeException {
 
         Object value = LModelValueVisitor.this.visit(pCIdExpression);
 
@@ -1262,7 +1264,8 @@ public class AssumptionToEdgeAllocator {
       }
 
       @Override
-      protected Value evaluateCFieldReference(CFieldReference pLValue) throws UnrecognizedCCodeException {
+      protected Value evaluateCFieldReference(CFieldReference pLValue)
+          throws UnrecognizedCodeException {
         Object value = LModelValueVisitor.this.visit(pLValue);
 
         if (value == null || !(value instanceof Number)) {
@@ -1274,7 +1277,7 @@ public class AssumptionToEdgeAllocator {
 
       @Override
       protected Value evaluateCArraySubscriptExpression(CArraySubscriptExpression pLValue)
-          throws UnrecognizedCCodeException {
+          throws UnrecognizedCodeException {
         Object value = LModelValueVisitor.this.visit(pLValue);
 
         if (value == null || !(value instanceof Number)) {
@@ -1292,7 +1295,7 @@ public class AssumptionToEdgeAllocator {
     }
   }
 
-  private class ValueLiteralsVisitor extends DefaultCTypeVisitor<ValueLiterals, RuntimeException> {
+  private class ValueLiteralsVisitor extends DefaultCTypeVisitor<ValueLiterals, NoException> {
 
     private final Object value;
     private final CExpression exp;
@@ -1382,7 +1385,7 @@ public class AssumptionToEdgeAllocator {
     }
 
     @Override
-    public ValueLiterals visit(CBitFieldType pCBitFieldType) throws RuntimeException {
+    public ValueLiterals visit(CBitFieldType pCBitFieldType) {
       return pCBitFieldType.getType().accept(this);
     }
 
@@ -1574,7 +1577,7 @@ public class AssumptionToEdgeAllocator {
      * Resolves all subexpressions that can be resolved.
      * Stops at duplicate memory location.
      */
-    private class ValueLiteralVisitor extends DefaultCTypeVisitor<Void, RuntimeException> {
+    private class ValueLiteralVisitor extends DefaultCTypeVisitor<Void, NoException> {
 
       /*Contains references already visited, to avoid descending indefinitely.
        *Shares a reference with all instanced Visitors resolving the given type.*/
@@ -1632,7 +1635,7 @@ public class AssumptionToEdgeAllocator {
       }
 
       @Override
-      public @Nullable Void visit(CBitFieldType pCBitFieldType) throws RuntimeException {
+      public @Nullable Void visit(CBitFieldType pCBitFieldType) {
         return pCBitFieldType.getType().accept(this);
       }
 
@@ -1896,7 +1899,7 @@ public class AssumptionToEdgeAllocator {
     }
 
     /*Resolve structs or union fields that are stored in the variable environment*/
-    private class ValueLiteralStructResolver extends DefaultCTypeVisitor<Void, RuntimeException> {
+    private class ValueLiteralStructResolver extends DefaultCTypeVisitor<Void, NoException> {
 
       private final ValueLiterals valueLiterals;
       private final String functionName;
@@ -1938,7 +1941,7 @@ public class AssumptionToEdgeAllocator {
       }
 
       @Override
-      public @Nullable Void visit(CBitFieldType pCBitFieldType) throws RuntimeException {
+      public @Nullable Void visit(CBitFieldType pCBitFieldType) {
         return pCBitFieldType.getType().accept(this);
       }
 
