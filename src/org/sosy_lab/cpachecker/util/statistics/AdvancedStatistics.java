@@ -30,6 +30,7 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Predicate;
 import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.interfaces.Statistics;
@@ -59,7 +60,7 @@ public class AdvancedStatistics implements Statistics {
   private final Map<Long, Deque<StatEvent>> openEvents = new HashMap<>();
 
   // counter for detected errors
-  private volatile int errors = 0;
+  private LongAdder errors = new LongAdder();
 
   public AdvancedStatistics(String name) {
     this.name = name;
@@ -89,7 +90,7 @@ public class AdvancedStatistics implements Statistics {
     if (baseTime.isRunning()) {
       // count all unclosed events as errors
       for (Deque<StatEvent> unclosedEvents : openEvents.values()) {
-        errors += unclosedEvents.size();
+        errors.add(unclosedEvents.size());
       }
       openEvents.clear();
 
@@ -239,11 +240,11 @@ public class AdvancedStatistics implements Statistics {
         if (pred.test(e)) {
           return e;
         } else {
-          errors++;
+          errors.increment();
         }
       }
     } else {
-      errors++;
+      errors.increment();
     }
     return null;
   }
@@ -259,7 +260,7 @@ public class AdvancedStatistics implements Statistics {
   @Override
   public void printStatistics(PrintStream out, Result result, UnmodifiableReachedSet reached) {
     baseStorage.printStatistics(out);
-    if (errors > 0) {
+    if (errors.intValue() > 0) {
       put(out, 0, "Defect StatEvents in " + name + " statistics", errors);
     }
   }
@@ -267,7 +268,7 @@ public class AdvancedStatistics implements Statistics {
   /**
    * Handle on an event until it is closed.
    */
-  public class StatEvent {
+  public static class StatEvent {
 
     final AbstractStatStorage storage;
     final Duration time;

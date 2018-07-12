@@ -24,49 +24,56 @@
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.DoubleAccumulator;
+import java.util.concurrent.atomic.DoubleAdder;
+import java.util.concurrent.atomic.LongAdder;
 import org.sosy_lab.cpachecker.util.statistics.StatKind;
 
 public class NumberValueOnlyStorage extends AbstractStatStorage {
 
-  int count_events = 0;
-  double value_total = 0, value_squared = 0;
-  double value_min = Double.MAX_VALUE, value_max = Double.MIN_VALUE;
+  LongAdder count_events = new LongAdder();
+  DoubleAdder value_total = new DoubleAdder(), value_squared = new DoubleAdder();
+  DoubleAccumulator value_min = new DoubleAccumulator(Math::min, Double.MAX_VALUE);
+  DoubleAccumulator value_max = new DoubleAccumulator(Math::max, Double.MIN_VALUE);
 
   public NumberValueOnlyStorage(String label) {
     super(label);
   }
 
   @Override
-  public synchronized void update(Duration duration, Object value) {
-
+  public void update(Duration duration, Object value) {
     if (value instanceof Number) {
-      Number n = (Number) value;
-      count_events++;
-      value_total += n.doubleValue();
-      value_squared += Math.pow(n.doubleValue(), 2);
-      value_min = Math.min(value_min, n.doubleValue());
-      value_max = Math.max(value_max, n.doubleValue());
+      double n = ((Number) value).doubleValue();
+      count_events.increment();
+      value_total.add(n);
+      value_squared.add(Math.pow(n, 2));
+      value_min.accumulate(n);
+      value_max.accumulate(n);
     }
   }
 
   @Override
   protected Object getPrintableStatistics(StatKind type) {
-    if (type == null && count_events > 1) {
+    if (type == null && count_events.intValue() > 1) {
       return String
-          .format("%.2f (avg=%.2f, max=%.2f)", value_total, value_total / count_events, value_max);
+          .format(
+              "%.2f (avg=%.2f, max=%.2f)",
+              value_total.doubleValue(),
+              value_total.doubleValue() / count_events.intValue(),
+              value_max.doubleValue());
     }else{
-      double printMe = value_total;
+      double printMe = value_total.doubleValue();
       if (type != null) {
         switch (type) {
           case AVG:
-            printMe = value_total / count_events;
+            printMe = value_total.doubleValue() / count_events.intValue();
             break;
           case COUNT:
-            printMe = count_events;
+            printMe = count_events.doubleValue();
             break;
           case SUM:
           default:
-            printMe = value_total;
+            printMe = value_total.doubleValue();
         }
       }
       return String.format((Math.floor(printMe) == Math.ceil(printMe)) ? "%.0f" : "%.2f", printMe);

@@ -24,27 +24,30 @@
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.LongAccumulator;
+import java.util.concurrent.atomic.LongAdder;
 import org.sosy_lab.common.time.TimeSpan;
 import org.sosy_lab.cpachecker.util.statistics.StatKind;
 
 public class TimeOnlyStorage extends AbstractStatStorage {
 
-  int count_events = 0;
-  long duration_total = 0, duration_squared = 0;
-  long duration_min = Long.MAX_VALUE, duration_max = Long.MIN_VALUE;
+  LongAdder count_events = new LongAdder();
+  LongAdder duration_total = new LongAdder(), duration_squared = new LongAdder();
+  LongAccumulator duration_min = new LongAccumulator(Math::min, Long.MAX_VALUE);
+  LongAccumulator duration_max = new LongAccumulator(Math::max, Long.MIN_VALUE);
 
   public TimeOnlyStorage(String label) {
     super(label);
   }
 
   @Override
-  public synchronized void update(Duration duration, Object value) {
+  public void update(Duration duration, Object value) {
     long dur = duration.toMillis();
-    count_events++;
-    duration_total += dur;
-    duration_squared += Math.multiplyExact(dur, dur);
-    duration_min = Math.min(duration_min, dur);
-    duration_max = Math.max(duration_max, dur);
+    count_events.increment();
+    duration_total.add(dur);
+    duration_squared.add(Math.multiplyExact(dur, dur));
+    duration_min.accumulate(dur);
+    duration_max.accumulate(dur);
   }
 
   @Override
@@ -58,24 +61,24 @@ public class TimeOnlyStorage extends AbstractStatStorage {
 
   @Override
   protected Object getPrintableStatistics(StatKind type) {
-    if (type == null && count_events > 1) {
+    if (type == null && count_events.intValue() > 1) {
       return String.format(
           "%s (avg=%s, max=%s)",
-          TimeSpan.ofMillis(duration_total),
-          TimeSpan.ofMillis(duration_total).divide(count_events),
-          TimeSpan.ofMillis(duration_max));
+          TimeSpan.ofMillis(duration_total.longValue()),
+          TimeSpan.ofMillis(duration_total.longValue()).divide(count_events.intValue()),
+          TimeSpan.ofMillis(duration_max.longValue()));
     } else if (type == null) {
-      return TimeSpan.ofMillis(duration_total);
+      return TimeSpan.ofMillis(duration_total.longValue());
     } else {
       switch (type) {
         case AVG:
-          return TimeSpan.ofMillis(duration_total).divide(count_events);
+          return TimeSpan.ofMillis(duration_total.longValue()).divide(count_events.intValue());
         case COUNT:
           return count_events;
         case SUM:
         default:
-          return TimeSpan.ofMillis(duration_total);
-      }
+          return TimeSpan.ofMillis(duration_total.longValue());
       }
     }
+  }
 }

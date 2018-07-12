@@ -24,6 +24,7 @@
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
 import java.io.PrintStream;
+import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
@@ -64,7 +65,8 @@ public abstract class AbstractStatStorage {
         AbstractStatStorage newChild = c.getDeclaredConstructor(String.class).newInstance(label);
         children.put(label, newChild);
         return newChild;
-      } catch (Exception e) {
+      } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+          | InvocationTargetException | NoSuchMethodException | SecurityException e) {
         return null;
       }
     }
