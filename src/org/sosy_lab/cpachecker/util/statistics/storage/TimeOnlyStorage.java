@@ -25,6 +25,7 @@ package org.sosy_lab.cpachecker.util.statistics.storage;
 
 import java.time.Duration;
 import org.sosy_lab.common.time.TimeSpan;
+import org.sosy_lab.cpachecker.util.statistics.StatKind;
 
 public class TimeOnlyStorage extends AbstractStatStorage {
 
@@ -56,17 +57,25 @@ public class TimeOnlyStorage extends AbstractStatStorage {
   }
 
   @Override
-  protected String getPrintableStatistics() {
-    if (count_events < 2) {
-      return TimeSpan.ofMillis(duration_total).toString();
-    } else {
+  protected Object getPrintableStatistics(StatKind type) {
+    if (type == null && count_events > 1) {
       return String.format(
           "%s (avg=%s, max=%s)",
           TimeSpan.ofMillis(duration_total),
           TimeSpan.ofMillis(duration_total).divide(count_events),
           TimeSpan.ofMillis(duration_max));
+    } else if (type == null) {
+      return TimeSpan.ofMillis(duration_total);
+    } else {
+      switch (type) {
+        case AVG:
+          return TimeSpan.ofMillis(duration_total).divide(count_events);
+        case COUNT:
+          return count_events;
+        case SUM:
+        default:
+          return TimeSpan.ofMillis(duration_total);
+      }
+      }
     }
-
-  }
-
 }

@@ -24,6 +24,7 @@
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
 import java.time.Duration;
+import org.sosy_lab.cpachecker.util.statistics.StatKind;
 
 public class NumberValueOnlyStorage extends AbstractStatStorage {
 
@@ -49,19 +50,26 @@ public class NumberValueOnlyStorage extends AbstractStatStorage {
   }
 
   @Override
-  public String getPrintableStatistics() {
-    if (count_events < 2) {
-      return String.format(
-          (Math.floor(value_total) == Math.ceil(value_total)) ? "%.0f" : "%.2f",
-          value_total);
-    } else {
-      return String.format(
-          "%.2f (avg=%.2f, max=%.2f)",
-          value_total,
-          value_total / count_events,
-          value_max);
+  protected Object getPrintableStatistics(StatKind type) {
+    if (type == null && count_events > 1) {
+      return String
+          .format("%.2f (avg=%.2f, max=%.2f)", value_total, value_total / count_events, value_max);
+    }else{
+      double printMe = value_total;
+      if (type != null) {
+        switch (type) {
+          case AVG:
+            printMe = value_total / count_events;
+            break;
+          case COUNT:
+            printMe = count_events;
+            break;
+          case SUM:
+          default:
+            printMe = value_total;
+        }
+      }
+      return String.format((Math.floor(printMe) == Math.ceil(printMe)) ? "%.0f" : "%.2f", printMe);
     }
-
   }
-
 }

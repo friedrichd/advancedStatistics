@@ -28,12 +28,19 @@ import java.time.Duration;
 import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Map.Entry;
+import org.sosy_lab.cpachecker.util.statistics.StatKind;
 import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
 
 public abstract class AbstractStatStorage {
 
+  // name of the storage
   public final String label;
+  // labeled, ordered list of all sub-storages
   private final Map<String, AbstractStatStorage> children =
+      Collections.synchronizedMap(new LinkedHashMap<>());
+  // ordered list of all display options
+  private final Map<StatKind, String> printOptions =
       Collections.synchronizedMap(new LinkedHashMap<>());
 
   public AbstractStatStorage(String label) {
@@ -112,7 +119,16 @@ public abstract class AbstractStatStorage {
    * @param level The amount of space in front of every line
    */
   public void printStatistics(PrintStream out, int level) {
-    StatisticsUtils.write(out, level, 50, adaptLabel(label), getPrintableStatistics());
+    // Without options, use the default.
+    if (printOptions.isEmpty()) {
+      StatisticsUtils.write(out, level, 50, adaptLabel(label), getPrintableStatistics());
+    } else {
+      // Write a separate line for every option
+      for (Entry<StatKind, String> option : printOptions.entrySet()) {
+        StatisticsUtils
+            .write(out, level, 50, option.getValue(), getPrintableStatistics(option.getKey()));
+      }
+    }
     synchronized (children) {
       for (AbstractStatStorage child : children.values()) {
         child.printStatistics(out, level + 1);
@@ -129,9 +145,22 @@ public abstract class AbstractStatStorage {
     return label;
   }
 
+  public void setPrintFormat(StatKind type, String label) {
+    printOptions.put(type, label);
+  }
+
+  /**
+   * Returns the default value of the storage unit in a nice, printable way.
+   */
+  protected Object getPrintableStatistics() {
+    return getPrintableStatistics(null);
+  }
+
   /**
    * Returns the value of the storage unit in a nice, printable way.
+   *
+   * @param type The requested type
    */
-  protected abstract String getPrintableStatistics();
+  protected abstract Object getPrintableStatistics(StatKind type);
 
 }

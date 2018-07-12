@@ -26,6 +26,7 @@ package org.sosy_lab.cpachecker.util.statistics.storage;
 import com.google.common.collect.ConcurrentHashMultiset;
 import com.google.common.collect.Multiset;
 import java.time.Duration;
+import org.sosy_lab.cpachecker.util.statistics.StatKind;
 
 public class ValueOnlyStorage extends AbstractStatStorage {
 
@@ -41,7 +42,7 @@ public class ValueOnlyStorage extends AbstractStatStorage {
   }
 
   @Override
-  public String getPrintableStatistics() {
+  public String getPrintableStatistics(StatKind type) {
     return hist.toString();
   }
 
