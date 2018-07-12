@@ -160,7 +160,7 @@ public class AdvancedStatistics implements Statistics {
    * @param label The name of the event
    */
   public void close(String label) {
-    StatEvent stored_event = pop(e -> e.hasLabel(label));
+    StatEvent stored_event = pop(e -> e.storage.label.equals(label));
     if (stored_event != null) {
       stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), stored_event.value);
     }
@@ -195,7 +195,7 @@ public class AdvancedStatistics implements Statistics {
    * @param value An additional value for categorization of the event
    */
   public void close(String label, Object value) {
-    StatEvent stored_event = pop(e -> e.hasLabel(label));
+    StatEvent stored_event = pop(e -> e.storage.label.equals(label));
     if (stored_event != null) {
       stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), value);
     }
@@ -273,19 +273,19 @@ public class AdvancedStatistics implements Statistics {
     final Duration time;
     Object value;
 
-    public StatEvent(Duration time, AbstractStatStorage storage) {
-      this.time = time;
+    public StatEvent(Duration start_time, AbstractStatStorage storage) {
+      this.time = start_time;
       this.storage = storage;
     }
 
-    public StatEvent(Duration time, AbstractStatStorage storage, Object value) {
-      this.time = time;
+    public StatEvent(Duration start_time, AbstractStatStorage storage, Object value) {
+      this.time = start_time;
       this.storage = storage;
       this.value = value;
     }
 
-    public boolean hasLabel(String label) {
-      return storage.label.equals(label);
+    public void setValue(Object value) {
+      this.value = value;
     }
 
   }
