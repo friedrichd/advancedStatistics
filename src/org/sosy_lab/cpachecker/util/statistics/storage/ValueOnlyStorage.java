@@ -38,7 +38,9 @@ public class ValueOnlyStorage extends AbstractStatStorage {
 
   @Override
   public synchronized void update(Duration duration, Object value) {
-    hist.add(value);
+    if (value != null) {
+      hist.add(value);
+    }
   }
 
   @Override
