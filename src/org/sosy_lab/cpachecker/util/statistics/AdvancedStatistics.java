@@ -166,6 +166,8 @@ public class AdvancedStatistics implements Statistics {
     StatEvent stored_event = pop(e -> e.storage.label.equals(label));
     if (stored_event != null) {
       stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), stored_event.value);
+    } else {
+      errors.increment();
     }
   }
 
@@ -184,6 +186,8 @@ public class AdvancedStatistics implements Statistics {
     StatEvent stored_event = pop(e -> e.equals(event));
     if (stored_event != null) {
       stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), stored_event.value);
+    } else {
+      errors.increment();
     }
   }
 
@@ -203,6 +207,8 @@ public class AdvancedStatistics implements Statistics {
     StatEvent stored_event = pop(e -> e.storage.label.equals(label));
     if (stored_event != null) {
       stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), value);
+    } else {
+      errors.increment();
     }
   }
 
@@ -222,6 +228,8 @@ public class AdvancedStatistics implements Statistics {
     StatEvent stored_event = pop(e -> e.equals(event));
     if (stored_event != null) {
       stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), value);
+    } else {
+      errors.increment();
     }
   }
 
