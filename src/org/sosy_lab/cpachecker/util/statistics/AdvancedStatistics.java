@@ -49,7 +49,8 @@ import org.sosy_lab.cpachecker.util.statistics.storage.ValueOnlyStorage;
  */
 public class AdvancedStatistics implements Statistics {
 
-  private static final String LABEL_TOTALTIME = "Total time for ";
+  private static final String ERROR_START_TRACKING =
+      "Please start tracking before trying to track something!";
 
   private final String name;
   private final Stopwatch baseTime = Stopwatch.createUnstarted();
@@ -64,7 +65,7 @@ public class AdvancedStatistics implements Statistics {
 
   public AdvancedStatistics(String name) {
     this.name = name;
-    this.baseStorage = new TimeOnlyStorage(LABEL_TOTALTIME + name);
+    this.baseStorage = new TimeOnlyStorage("Total time for " + name);
   }
 
   @Override
@@ -105,7 +106,7 @@ public class AdvancedStatistics implements Statistics {
    * @param label representing the name of the event
    */
   public void track(String label) {
-    assert baseTime.isRunning() : "Please start tracking before trying to track something!";
+    assert baseTime.isRunning() : ERROR_START_TRACKING;
     getCurrentStorage().getChildOrDefault(label, ValueOnlyStorage.class).update();
   }
 
@@ -116,7 +117,7 @@ public class AdvancedStatistics implements Statistics {
    * @param value An additional value for categorization of the event
    */
   public void track(String label, Object value) {
-    assert baseTime.isRunning() : "Please start tracking before trying to track something!";
+    assert baseTime.isRunning() : ERROR_START_TRACKING;
     if (value instanceof Number) {
       getCurrentStorage().getChildOrDefault(label, NumberValueOnlyStorage.class).update(value);
     } else {
@@ -131,7 +132,7 @@ public class AdvancedStatistics implements Statistics {
    * @param label The name of the event
    */
   public StatEvent open(String label) {
-    assert baseTime.isRunning() : "Please start tracking before trying to open an event!";
+    assert baseTime.isRunning() : ERROR_START_TRACKING;
     AbstractStatStorage current =
         getCurrentStorage().getChildOrDefault(label, TimeOnlyStorage.class);
     return push(new StatEvent(baseTime.elapsed(), current));
@@ -144,7 +145,7 @@ public class AdvancedStatistics implements Statistics {
    * @param value An additional value for categorization of the event
    */
   public StatEvent open(String label, Object value) {
-    assert baseTime.isRunning() : "Please start tracking before trying to open an event!";
+    assert baseTime.isRunning() : ERROR_START_TRACKING;
     AbstractStatStorage current =
         getCurrentStorage().getChildOrDefault(label, TimeOnlyStorage.class);
     return push(new StatEvent(baseTime.elapsed(), current, value));
@@ -161,6 +162,7 @@ public class AdvancedStatistics implements Statistics {
    * @param label The name of the event
    */
   public void close(String label) {
+    assert baseTime.isRunning() : ERROR_START_TRACKING;
     StatEvent stored_event = pop(e -> e.storage.label.equals(label));
     if (stored_event != null) {
       stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), stored_event.value);
@@ -178,6 +180,7 @@ public class AdvancedStatistics implements Statistics {
    * @param event The handle on the event
    */
   public void close(StatEvent event) {
+    assert baseTime.isRunning() : ERROR_START_TRACKING;
     StatEvent stored_event = pop(e -> e.equals(event));
     if (stored_event != null) {
       stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), stored_event.value);
@@ -196,6 +199,7 @@ public class AdvancedStatistics implements Statistics {
    * @param value An additional value for categorization of the event
    */
   public void close(String label, Object value) {
+    assert baseTime.isRunning() : ERROR_START_TRACKING;
     StatEvent stored_event = pop(e -> e.storage.label.equals(label));
     if (stored_event != null) {
       stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), value);
@@ -214,6 +218,7 @@ public class AdvancedStatistics implements Statistics {
    * @param value An additional value for categorization of the event
    */
   public void close(StatEvent event, Object value) {
+    assert baseTime.isRunning() : ERROR_START_TRACKING;
     StatEvent stored_event = pop(e -> e.equals(event));
     if (stored_event != null) {
       stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), value);
