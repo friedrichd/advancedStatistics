@@ -72,7 +72,8 @@ public class TimeOnlyStorage extends AbstractStatStorage {
     } else {
       switch (type) {
         case AVG:
-          return TimeSpan.ofMillis(duration_total.longValue()).divide(count_events.intValue());
+          return TimeSpan.ofMillis(duration_total.longValue())
+              .divide(count_events.intValue() > 1 ? count_events.intValue() : 1);
         case COUNT:
           return count_events.intValue();
         case SUM:
