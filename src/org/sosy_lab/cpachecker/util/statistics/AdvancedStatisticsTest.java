@@ -24,6 +24,9 @@ import static org.junit.Assert.assertTrue;
 
 import java.io.ByteArrayOutputStream;
 import java.io.PrintStream;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
 import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics.StatEvent;
@@ -106,21 +109,28 @@ public class AdvancedStatisticsTest {
   @Test
   public void openclose_multiple() throws InterruptedException {
     as.startTracking();
-    Thread t1 = new TestWorker(10, 5);
-    t1.start();
-    Thread t2 = new TestWorker(2, 100);
-    t2.start();
-    Thread t3 = new TestWorker(4, 20);
-    t3.start();
-    t1.join();
-    t2.join();
-    t3.join();
+    ExecutorService es = Executors.newCachedThreadPool();
+    es.execute(new TestWorker(18, 5));
+    es.execute(new TestWorker(2, 100));
+    es.execute(new TestWorker(8, 20));
+    es.shutdown();
+
+    StatEvent t = as.open("Test");
+    t.storage.setPrintFormat(StatKind.COUNT, "Counter for Test");
+    t.storage.setPrintFormat(StatKind.AVG, "AVG for Test");
+    t.storage.setPrintFormat(StatKind.SUM, "SUM for Test");
+    Thread.sleep(2);
+    as.close(t);
+
+    boolean terminated = es.awaitTermination(1, TimeUnit.MINUTES);
+    assertTrue("Time elapsed before all workers terminated.", terminated);
+
     as.stopTracking();
     as.printStatistics(new PrintStream(outContent), null, null);
 
     assertFalse("PrintStream is empty!", outContent.toString().isEmpty());
     assertContains("Total time for foo", null);
-    assertContains("Counter for Test", "16");
+    assertContains("Counter for Test", "29");
     assertNotContains("Defect StatEvents");
   }
 
@@ -149,11 +159,10 @@ public class AdvancedStatisticsTest {
         outContent.toString().toLowerCase().replaceAll("\\s+", " ").contains(label.toLowerCase()));
   }
 
-  class TestWorker extends Thread {
+  class TestWorker implements Runnable {
     final int wait, times;
 
     public TestWorker(int times, int wait) {
-      super();
       this.wait = wait;
       this.times = times;
     }
@@ -162,7 +171,6 @@ public class AdvancedStatisticsTest {
     public void run() {
       for (int j = 0; j < times; j++) {
         StatEvent t = as.open("Test");
-        t.storage.setPrintFormat(StatKind.COUNT, "Counter for Test");
         try {
           Thread.sleep(wait);
         } catch (InterruptedException e) {
