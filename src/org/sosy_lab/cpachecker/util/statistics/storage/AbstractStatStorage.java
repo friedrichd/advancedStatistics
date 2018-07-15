@@ -56,7 +56,7 @@ public abstract class AbstractStatStorage {
    *        {@link java.lang.String String} )
    * @return The (new) sub-storage
    */
-  public AbstractStatStorage
+  public synchronized AbstractStatStorage
       getChildOrDefault(String label, Class<? extends AbstractStatStorage> c) {
     if (children.containsKey(label)) {
       return children.get(label);

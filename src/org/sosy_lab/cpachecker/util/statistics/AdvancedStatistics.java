@@ -233,7 +233,7 @@ public class AdvancedStatistics implements Statistics {
     }
   }
 
-  private StatEvent push(StatEvent event) {
+  private synchronized StatEvent push(StatEvent event) {
     long id = Thread.currentThread().getId();
     if (!openEvents.containsKey(id)) {
       openEvents.put(id, new ArrayDeque<StatEvent>());
@@ -242,7 +242,7 @@ public class AdvancedStatistics implements Statistics {
     return event;
   }
 
-  private StatEvent pop(Predicate<StatEvent> pred) {
+  private synchronized StatEvent pop(Predicate<StatEvent> pred) {
     long id = Thread.currentThread().getId();
     if (openEvents.containsKey(id)
         && !openEvents.get(id).isEmpty()
