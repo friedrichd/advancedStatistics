@@ -23,7 +23,7 @@
  */
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
-import java.io.PrintStream;
+import com.google.common.base.Strings;
 import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
 import java.util.Collections;
@@ -31,7 +31,6 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 import org.sosy_lab.cpachecker.util.statistics.StatKind;
-import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
 
 public abstract class AbstractStatStorage {
 
@@ -106,36 +105,38 @@ public abstract class AbstractStatStorage {
   public abstract void update(Duration duration, Object value);
 
   /**
-   * Prints the statistics storage with all sub-storages.
-   *
-   * @param out The output stream
+   * Returns a string representation of statistics storage with all sub-storages.
    */
-  public void printStatistics(PrintStream out) {
-    printStatistics(out, 0);
+  @Override
+  public String toString() {
+    return toString(0);
   }
 
-  /**
-   * Prints the statistics storage with all sub-storages.
-   *
-   * @param out The output stream
-   * @param level The amount of space in front of every line
-   */
-  public void printStatistics(PrintStream out, int level) {
-    // Without options, use the default.
+  private String toString(int level) {
+    StringBuilder sb = new StringBuilder();
     if (printOptions.isEmpty()) {
-      StatisticsUtils.write(out, level, 50, adaptLabel(label), getPrintableStatistics());
+      // Without options, use the default.
+      sb.append(String.format(
+          "%-50s %s",
+          Strings.repeat("  ", level) + adaptLabel(label) + ":",
+          getPrintableStatistics())).append(System.lineSeparator());
     } else {
       // Write a separate line for every option
       for (Entry<StatKind, String> option : printOptions.entrySet()) {
-        StatisticsUtils
-            .write(out, level, 50, option.getValue(), getPrintableStatistics(option.getKey()));
+        sb.append(
+            String.format(
+                "%-50s %s%n",
+                Strings.repeat("  ", level) + option.getValue() + ":",
+                getPrintableStatistics(option.getKey())))
+            .append(System.lineSeparator());
       }
     }
     synchronized (children) {
       for (AbstractStatStorage child : children.values()) {
-        child.printStatistics(out, level + 1);
+        sb.append(child.toString(level + 1));
       }
     }
+    return sb.toString();
   }
 
   /**

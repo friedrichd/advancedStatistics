@@ -56,12 +56,11 @@ public class AdvancedStatistics implements Statistics {
   private final Stopwatch baseTime = Stopwatch.createUnstarted();
 
   // root of the storage tree
-  private final AbstractStatStorage baseStorage;
+  protected final AbstractStatStorage baseStorage;
   // contains the stack of open events for all threads
   private final Map<Long, Deque<StatEvent>> openEvents = new HashMap<>();
-
   // counter for detected errors
-  private LongAdder errors = new LongAdder();
+  private final LongAdder errors = new LongAdder();
 
   public AdvancedStatistics(String name) {
     this.name = name;
@@ -272,9 +271,9 @@ public class AdvancedStatistics implements Statistics {
 
   @Override
   public void printStatistics(PrintStream out, Result result, UnmodifiableReachedSet reached) {
-    baseStorage.printStatistics(out);
+    out.print(baseStorage);
     if (errors.intValue() > 0) {
-      put(out, 0, "Defect StatEvents in " + name + " statistics", errors);
+      put(out, "Defect StatEvents in " + name + " statistics", errors);
     }
   }
 

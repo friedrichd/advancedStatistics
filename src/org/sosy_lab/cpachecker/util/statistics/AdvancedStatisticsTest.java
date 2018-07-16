@@ -22,8 +22,6 @@ package org.sosy_lab.cpachecker.util.statistics;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
-import java.io.ByteArrayOutputStream;
-import java.io.PrintStream;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -34,12 +32,10 @@ import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics.StatEvent;
 public class AdvancedStatisticsTest {
 
   private AdvancedStatistics as;
-  private ByteArrayOutputStream outContent;
 
   @Before
   public void init() {
     as = new AdvancedStatistics("foo");
-    outContent = new ByteArrayOutputStream();
   }
 
   @Test(expected = AssertionError.class)
@@ -62,11 +58,11 @@ public class AdvancedStatisticsTest {
     as.startTracking();
     Thread.sleep(10);
     as.stopTracking();
-    as.printStatistics(new PrintStream(outContent), null, null);
+    String out = as.baseStorage.toString();
 
-    assertFalse("PrintStream is empty!", outContent.toString().isEmpty());
-    assertContains("Total time for foo", null);
-    assertNotContains("Defect StatEvents");
+    assertFalse("PrintStream is empty!", out.isEmpty());
+    assertContains("Total time for foo", null, out);
+    assertNotContains("Defect StatEvents", out);
   }
 
   @Test
@@ -76,12 +72,12 @@ public class AdvancedStatisticsTest {
       as.track("Test", (i % 2 == 0 ? "A" : "B"));
     }
     as.stopTracking();
-    as.printStatistics(new PrintStream(outContent), null, null);
+    String out = as.baseStorage.toString();
 
-    assertFalse("PrintStream is empty!", outContent.toString().isEmpty());
-    assertContains("Total time for foo", null);
-    assertContains("Test", "[A x 5, B x 4]");
-    assertNotContains("Defect StatEvents");
+    assertFalse("PrintStream is empty!", out.isEmpty());
+    assertContains("Total time for foo", null, out);
+    assertContains("Test", "[A x 5, B x 4]", out);
+    assertNotContains("Defect StatEvents", out);
   }
 
   @Test
@@ -96,14 +92,14 @@ public class AdvancedStatisticsTest {
       as.close(t);
     }
     as.stopTracking();
-    as.printStatistics(new PrintStream(outContent), null, null);
+    String out = as.baseStorage.toString();
 
-    assertFalse("PrintStream is empty!", outContent.toString().isEmpty());
-    assertContains("Total time for foo", null);
-    assertContains("Counter for Test", "9");
-    assertContains("AVG for Test", null);
-    assertContains("SUM for Test", null);
-    assertNotContains("Defect StatEvents");
+    assertFalse("PrintStream is empty!", out.isEmpty());
+    assertContains("Total time for foo", null, out);
+    assertContains("Counter for Test", "9", out);
+    assertContains("AVG for Test", null, out);
+    assertContains("SUM for Test", null, out);
+    assertNotContains("Defect StatEvents", out);
   }
 
   @Test
@@ -126,37 +122,34 @@ public class AdvancedStatisticsTest {
     assertTrue("Time elapsed before all workers terminated.", terminated);
 
     as.stopTracking();
-    as.printStatistics(new PrintStream(outContent), null, null);
+    String out = as.baseStorage.toString();
 
-    assertFalse("PrintStream is empty!", outContent.toString().isEmpty());
-    assertContains("Total time for foo", null);
-    assertContains("Counter for Test", "29");
-    assertNotContains("Defect StatEvents");
+    assertFalse("PrintStream is empty!", out.isEmpty());
+    assertContains("Total time for foo", null, out);
+    assertContains("Counter for Test", "29", out);
+    assertNotContains("Defect StatEvents", out);
   }
 
-  private void assertContains(String label, String value) {
+  private void assertContains(String label, String value, String haystack) {
     assertTrue(
-        "PrintStream does not contain \"" + label + "\"! " + outContent.toString(),
-        outContent.toString()
-            .toLowerCase()
-            .replaceAll("\\s+", " ")
-            .contains(label.toLowerCase() + ":"));
+        "PrintStream does not contain \"" + label + "\"! " + haystack,
+        haystack.toLowerCase().replaceAll("\\s+", " ").contains(label.toLowerCase() + ":"));
 
     if (value != null) {
-      int k = outContent.toString().indexOf(label + ":");
+      int k = haystack.indexOf(label + ":");
       k += label.length() + 2;
-      int k2 = outContent.toString().indexOf("\n", k);
-      String v = outContent.toString().substring(k, k2).trim();
+      int k2 = haystack.indexOf("\n", k);
+      String v = haystack.substring(k, k2).trim();
       assertTrue(
-          "\"" + label + "\" is " + v + ", but should be " + value + "! " + outContent.toString(),
+          "\"" + label + "\" is " + v + ", but should be " + value + "! " + haystack,
           value.equals(v));
     }
   }
 
-  private void assertNotContains(String label) {
+  private void assertNotContains(String label, String haystack) {
     assertFalse(
-        "PrintStream contains \"" + label + "\"! " + outContent.toString(),
-        outContent.toString().toLowerCase().replaceAll("\\s+", " ").contains(label.toLowerCase()));
+        "PrintStream contains \"" + label + "\"! " + haystack,
+        haystack.toLowerCase().replaceAll("\\s+", " ").contains(label.toLowerCase()));
   }
 
   class TestWorker implements Runnable {
