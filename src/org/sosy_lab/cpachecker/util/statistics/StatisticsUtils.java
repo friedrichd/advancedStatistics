@@ -51,6 +51,16 @@ public class StatisticsUtils {
     return String.format("%.2f", val / full);
   }
 
+  /**
+   * Escapes string by removing repetitions of points ("..." becomes ".") and converting all
+   * characters to lower case.
+   *
+   * @param raw A string
+   */
+  public static String escape(String raw) {
+    return String.join(".", raw.toLowerCase().split("\\.+"));
+  }
+
   public static void write(PrintStream target, int indentLevel, int outputNameColWidth,
       String name, Object value) {
     String indentation = Strings.repeat("  ", indentLevel);
@@ -61,6 +71,17 @@ public class StatisticsUtils {
   public static void write(PrintStream target, int indentLevel, int outputNameColWidth,
       AbstractStatValue stat) {
     write(target, indentLevel, outputNameColWidth, stat.getTitle(), stat.toString());
+  }
+
+  public static void write(StringBuilder sb, String name, Object value) {
+    sb.append(String.format("%-50s %s", name + ":", value)).append(System.lineSeparator());
+  }
+
+  public static void
+      write(StringBuilder sb, int indentLevel, int outputNameColWidth, String name, Object value) {
+    String indentation = Strings.repeat("  ", indentLevel);
+    sb.append(String.format("%-" + outputNameColWidth + "s %s", indentation + name + ":", value))
+        .append(System.lineSeparator());
   }
 
   /**
