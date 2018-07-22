@@ -59,6 +59,7 @@ import org.sosy_lab.cpachecker.exceptions.CPAException;
 import org.sosy_lab.cpachecker.exceptions.RefinementFailedException;
 import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics;
 import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics.StatEvent;
+import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
 
 public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSetUpdater {
 
@@ -95,7 +96,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
         out.println("Avg. size of reached set before ref.: " + div(totalReachedSizeBeforeRefinement, countRefinements));
         out.println("Avg. size of reached set after ref.:  " + div(totalReachedSizeAfterRefinement, countSuccessfulRefinements));
         out.println("");
-        out.println("Total time for CEGAR algorithm: " + totalTimer);
+        out.println("Total time for CEGAR algorithm:   " + totalTimer);
         out.println("Time for refinements:             " + refinementTimer);
         out.println("Average time for refinement:      " + refinementTimer.getAvgTime().formatAs(TimeUnit.SECONDS));
         out.println("Max time for refinement:          " + refinementTimer.getMaxTime().formatAs(TimeUnit.SECONDS));
@@ -104,7 +105,28 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
   }
 
   private final CEGARStatistics stats = new CEGARStatistics();
-  private final AdvancedStatistics stats2 = new AdvancedStatistics("CEGAR (advanced)");
+  private final AdvancedStatistics stats2 =
+      new AdvancedStatistics("CEGAR algorithm").addBasicTemplate(() -> {
+        StringBuilder sb = new StringBuilder();
+        StatisticsUtils.write(sb, "Number of refinements", "$refinement.count$");
+        StatisticsUtils.write(sb, "Number of successful refinements", "$refinement.true.count$");
+        StatisticsUtils.write(sb, "Number of failed refinements", "$refinement.false.count$");
+        StatisticsUtils
+            .write(sb, "Max. size of reached set before ref.", "$reachedSetBefore.value.max$");
+        StatisticsUtils
+            .write(sb, "Max. size of reached set after ref.", "$reachedAfterBefore.value.max$");
+        StatisticsUtils
+            .write(sb, "Avg. size of reached set before ref.", "$reachedSetBefore.value.avg$");
+        StatisticsUtils
+            .write(sb, "Avg. size of reached set after ref.", "$reachedAfterBefore.value.avg$");
+        sb.append(System.lineSeparator());
+        StatisticsUtils
+            .write(sb, "Total time for CEGAR algorithm", "$time.sum$");
+        StatisticsUtils.write(sb, "Time for refinements", "$refinement.time.sum$");
+        StatisticsUtils.write(sb, "Average time for refinement", "$refinement.time.avg$");
+        StatisticsUtils.write(sb, "Max time for refinement", "$refinement.time.max$");
+        return sb.toString();
+      });
 
   private final List<ReachedSetUpdateListener> reachedSetUpdateListeners =
       new CopyOnWriteArrayList<>();
@@ -345,6 +367,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
     }
     pStatsCollection.add(stats);
     pStatsCollection.add(stats2);
+    stats2.collectStatistics(pStatsCollection);
   }
 
   @Override

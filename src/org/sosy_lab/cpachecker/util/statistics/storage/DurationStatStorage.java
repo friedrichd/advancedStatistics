@@ -25,6 +25,7 @@ package org.sosy_lab.cpachecker.util.statistics.storage;
 
 import java.time.Duration;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 import org.sosy_lab.common.time.TimeSpan;
 
 /** Works like a {@link NumberStatStorage}, but allows to work with TimeSpan and Duration. */
@@ -55,7 +56,7 @@ public class DurationStatStorage implements StatStorageStrategy {
         && !method.equals("count")
         && ret instanceof Double
         && !ret.equals(Double.NaN)) {
-      return TimeSpan.ofMillis(((Double) ret).longValue());
+      return TimeSpan.ofMillis(((Double) ret).longValue()).formatAs(TimeUnit.SECONDS);
     } else {
       return ret;
     }
