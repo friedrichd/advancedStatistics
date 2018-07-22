@@ -24,30 +24,42 @@
 package org.sosy_lab.cpachecker.util.statistics;
 
 import com.google.common.base.Stopwatch;
+import java.io.File;
 import java.io.PrintStream;
 import java.time.Duration;
 import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Predicate;
+import java.util.function.Supplier;
 import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.interfaces.Statistics;
 import org.sosy_lab.cpachecker.core.interfaces.StatisticsProvider;
 import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
-import org.sosy_lab.cpachecker.util.statistics.storage.AbstractStatStorage;
-import org.sosy_lab.cpachecker.util.statistics.storage.NumberValueOnlyStorage;
-import org.sosy_lab.cpachecker.util.statistics.storage.TimeOnlyStorage;
-import org.sosy_lab.cpachecker.util.statistics.storage.ValueOnlyStorage;
+import org.sosy_lab.cpachecker.util.statistics.output.BasicStatOutputStrategy;
+import org.sosy_lab.cpachecker.util.statistics.output.StatOutputStrategy;
+import org.sosy_lab.cpachecker.util.statistics.storage.StatStorage;
 
 /**
- * A class to output statistics and results of an analysis in an advanced way.
+ * A class to output statistics and results of an analysis in an advanced way.</br>
+ * <strong>Notice:</strong> For any instance "stats" of AdvancedStatistics, both
+ * <ol>
+ * <li>&lt;StatsCollection&gt;.add(stats)) and</li>
+ * <li>stats.collectStatistics(&lt;StatsCollection&gt;)</li>
+ * </ol>
+ * need to be called in the <code>collectStatistics</code> method of the surrounding
+ * {@link StatisticsProvider}. Otherwise some statistics might not be printed.
  *
- * You usually want to implement {@link StatisticsProvider} and register your Statistics instances
- * so that they are actually called after CPAchecker finishes.
  */
-public class AdvancedStatistics implements Statistics {
+public class AdvancedStatistics implements Statistics, StatisticsProvider {
 
   private static final String ERROR_START_TRACKING =
       "Please start tracking before trying to track something!";
@@ -55,8 +67,12 @@ public class AdvancedStatistics implements Statistics {
   private final String name;
   private final Stopwatch baseTime = Stopwatch.createUnstarted();
 
-  // root of the storage tree
-  protected final AbstractStatStorage baseStorage;
+  // Entry point for storing the statistics
+  private final StatStorage baseStorage = new StatStorage();
+  // Variants for printing statistics
+  private final List<StatOutputStrategy> printStrategy =
+      Collections.synchronizedList(new ArrayList<>());
+
   // contains the stack of open events for all threads
   private final Map<Long, Deque<StatEvent>> openEvents = new HashMap<>();
   // counter for detected errors
@@ -64,12 +80,35 @@ public class AdvancedStatistics implements Statistics {
 
   public AdvancedStatistics(String name) {
     this.name = name;
-    this.baseStorage = new TimeOnlyStorage("Total time for " + name);
   }
 
   @Override
   public String getName() {
-    return name;
+    return null;
+  }
+
+  /** Adds a new output to this statistic. */
+  public AdvancedStatistics addOutputStrategy(StatOutputStrategy output) {
+    assert !baseTime.isRunning()
+        && baseTime.elapsed().isZero() : "Outputs have to be added before tracking is started!";
+    printStrategy.add(output);
+    return this;
+  }
+
+  /** Adds a new template for the default statistics file. */
+  public AdvancedStatistics addBasicTemplate(Supplier<String> loadTemplate) {
+    assert !baseTime.isRunning()
+        && baseTime.elapsed().isZero() : "Outputs have to be added before tracking is started!";
+    printStrategy.add(new BasicStatOutputStrategy(name, baseStorage, loadTemplate));
+    return this;
+  }
+
+  /** Adds a new template for the default statistics file. */
+  public AdvancedStatistics addBasicTemplate(File templateFile) {
+    assert !baseTime.isRunning()
+        && baseTime.elapsed().isZero() : "Outputs have to be added before tracking is started!";
+    printStrategy.add(new BasicStatOutputStrategy(name, baseStorage, templateFile));
+    return this;
   }
 
   /**
@@ -78,6 +117,11 @@ public class AdvancedStatistics implements Statistics {
    */
   public synchronized void startTracking() {
     if (!baseTime.isRunning() && baseTime.elapsed().isZero()) {
+      Set<String> variables = new HashSet<>();
+      for (StatOutputStrategy out : printStrategy) {
+        variables.addAll(out.getRequiredVariables());
+      }
+      baseStorage.createVariables(variables);
       baseTime.start();
     }
   }
@@ -104,9 +148,8 @@ public class AdvancedStatistics implements Statistics {
    *
    * @param label representing the name of the event
    */
-  public void track(String label) {
-    assert baseTime.isRunning() : ERROR_START_TRACKING;
-    getCurrentStorage().getChildOrDefault(label, ValueOnlyStorage.class).update();
+  public StatEvent track(String label) {
+    return createEvent(label).store();
   }
 
   /**
@@ -115,13 +158,8 @@ public class AdvancedStatistics implements Statistics {
    * @param label The name of the event
    * @param value An additional value for categorization of the event
    */
-  public void track(String label, Object value) {
-    assert baseTime.isRunning() : ERROR_START_TRACKING;
-    if (value instanceof Number) {
-      getCurrentStorage().getChildOrDefault(label, NumberValueOnlyStorage.class).update(value);
-    } else {
-      getCurrentStorage().getChildOrDefault(label, ValueOnlyStorage.class).update(value);
-    }
+  public StatEvent track(String label, Object value) {
+    return createEvent(label).setValue(value).store();
   }
 
   /**
@@ -131,10 +169,7 @@ public class AdvancedStatistics implements Statistics {
    * @param label The name of the event
    */
   public StatEvent open(String label) {
-    assert baseTime.isRunning() : ERROR_START_TRACKING;
-    AbstractStatStorage current =
-        getCurrentStorage().getChildOrDefault(label, TimeOnlyStorage.class);
-    return push(new StatEvent(baseTime.elapsed(), current));
+    return push(createEvent(label));
   }
 
   /**
@@ -144,10 +179,21 @@ public class AdvancedStatistics implements Statistics {
    * @param value An additional value for categorization of the event
    */
   public StatEvent open(String label, Object value) {
+    return push(createEvent(label).setValue(value));
+  }
+
+  /** Creates a new event for the given label. */
+  private StatEvent createEvent(String label) {
     assert baseTime.isRunning() : ERROR_START_TRACKING;
-    AbstractStatStorage current =
-        getCurrentStorage().getChildOrDefault(label, TimeOnlyStorage.class);
-    return push(new StatEvent(baseTime.elapsed(), current, value));
+    return new StatEvent(label, baseTime.elapsed(), getCurrentStorage().getSubStorage(label));
+  }
+
+  /** Validates if an event is open on the current thread for given label. */
+  public boolean hasOpenEvent(String label) {
+    long id = Thread.currentThread().getId();
+    return openEvents.containsKey(id)
+        && !openEvents.get(id).isEmpty()
+        && openEvents.get(id).stream().anyMatch(a -> a.label.equals(label));
   }
 
   /**
@@ -162,11 +208,9 @@ public class AdvancedStatistics implements Statistics {
    */
   public void close(String label) {
     assert baseTime.isRunning() : ERROR_START_TRACKING;
-    StatEvent stored_event = pop(e -> e.storage.label.equals(label));
+    StatEvent stored_event = pop(e -> e.label.equals(label));
     if (stored_event != null) {
-      stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), stored_event.value);
-    } else {
-      errors.increment();
+      stored_event.store(baseTime.elapsed());
     }
   }
 
@@ -184,9 +228,7 @@ public class AdvancedStatistics implements Statistics {
     assert baseTime.isRunning() : ERROR_START_TRACKING;
     StatEvent stored_event = pop(e -> e.equals(event));
     if (stored_event != null) {
-      stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), stored_event.value);
-    } else {
-      errors.increment();
+      stored_event.store(baseTime.elapsed());
     }
   }
 
@@ -203,11 +245,10 @@ public class AdvancedStatistics implements Statistics {
    */
   public void close(String label, Object value) {
     assert baseTime.isRunning() : ERROR_START_TRACKING;
-    StatEvent stored_event = pop(e -> e.storage.label.equals(label));
+    StatEvent stored_event = pop(e -> e.label.equals(label));
     if (stored_event != null) {
-      stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), value);
-    } else {
-      errors.increment();
+      stored_event.setValue(value);
+      stored_event.store(baseTime.elapsed());
     }
   }
 
@@ -226,9 +267,8 @@ public class AdvancedStatistics implements Statistics {
     assert baseTime.isRunning() : ERROR_START_TRACKING;
     StatEvent stored_event = pop(e -> e.equals(event));
     if (stored_event != null) {
-      stored_event.storage.update(baseTime.elapsed().minus(stored_event.time), value);
-    } else {
-      errors.increment();
+      stored_event.setValue(value);
+      stored_event.store(baseTime.elapsed());
     }
   }
 
@@ -261,7 +301,7 @@ public class AdvancedStatistics implements Statistics {
     return null;
   }
 
-  private AbstractStatStorage getCurrentStorage() {
+  private StatStorage getCurrentStorage() {
     long id = Thread.currentThread().getId();
     if (openEvents.containsKey(id) && !openEvents.get(id).isEmpty()) {
       return openEvents.get(id).getFirst().storage;
@@ -270,36 +310,95 @@ public class AdvancedStatistics implements Statistics {
   }
 
   @Override
-  public void printStatistics(PrintStream out, Result result, UnmodifiableReachedSet reached) {
-    out.print(baseStorage);
-    if (errors.intValue() > 0) {
-      put(out, "Defect StatEvents in " + name + " statistics", errors);
+  public void collectStatistics(Collection<Statistics> pStatsCollection) {
+    for (StatOutputStrategy outStrategy : printStrategy) {
+      if (outStrategy instanceof Statistics) {
+        pStatsCollection.add((Statistics) outStrategy);
+      }
     }
   }
+
+  @Override
+  public void printStatistics(PrintStream out, Result result, UnmodifiableReachedSet reached) {
+    printStatistics();
+  }
+
+  public void printStatistics() {
+    for (StatOutputStrategy outStrategy : printStrategy) {
+      if (!(outStrategy instanceof Statistics)) {
+        outStrategy.write(baseStorage.getVariableMap());
+      }
+    }
+    // TODO: ERRORHANDLING
+  }
+
 
   /**
    * Handle on an event until it is closed.
    */
   public static class StatEvent {
 
-    final AbstractStatStorage storage;
-    final Duration time;
-    Object value;
+    private final String label;
+    private final StatStorage storage;
+    private final Duration start_time;
+    private Object value = null;
+    private boolean stored = false;
 
-    public StatEvent(Duration start_time, AbstractStatStorage storage) {
-      this.time = start_time;
+    public StatEvent(String label, Duration start_time, StatStorage storage) {
+      this.label = label;
+      this.start_time = start_time;
       this.storage = storage;
     }
 
-    public StatEvent(Duration start_time, AbstractStatStorage storage, Object value) {
-      this.time = start_time;
-      this.storage = storage;
+    /**
+     * Adds some value (e.g. for categorization) to the event.
+     *
+     * @param value An additional value
+     */
+    public StatEvent setValue(Object value) {
       this.value = value;
+      return this;
     }
 
-    public void setValue(Object value) {
-      this.value = value;
+    /**
+     * Stores the event without termination time (therefore without duration).
+     */
+    private synchronized StatEvent store() {
+      assert !stored : "This event has already been stored!";
+      if (value == null) {
+        storage.update();
+      } else {
+        storage.update(value);
+      }
+      stored = true;
+      return this;
     }
+
+    /**
+     * Stores the event.
+     *
+     * @param end_time The time when the event was terminated.
+     */
+    private synchronized StatEvent store(Duration end_time) {
+      assert !stored : "This event has already been stored!";
+      if (end_time == null || start_time.compareTo(end_time) > 0) {
+        store();
+      } else if(value == null){
+        storage.update(end_time.minus(start_time));
+      } else {
+        storage.update(end_time.minus(start_time), value);
+      }
+      stored = true;
+      return this;
+    }
+
+    /*
+     * public void setDurationFormat(String label, String template) {
+     * storage.setDurationFormat(label, template); }
+     *
+     * public void setValueFormat(String label, String template) { storage.setValueFormat(label,
+     * template); }
+     */
 
   }
 

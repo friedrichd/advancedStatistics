@@ -28,6 +28,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
 import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics.StatEvent;
+import org.sosy_lab.cpachecker.util.statistics.output.StatOutputStrategy;
 
 public class AdvancedStatisticsTest {
 
@@ -55,11 +56,16 @@ public class AdvancedStatisticsTest {
 
   @Test
   public void startstop() throws InterruptedException {
+    StringBuilder sb = new StringBuilder();
+    as.addOutputStrategy(
+        new StatOutputStrategy(() -> "Total time for foo: $time.sum$\n")
+            .addOutputWriter(s -> sb.append(s)));
     as.startTracking();
     Thread.sleep(10);
     as.stopTracking();
-    String out = as.baseStorage.toString();
+    as.printStatistics();
 
+    String out = sb.toString();
     assertFalse("PrintStream is empty!", out.isEmpty());
     assertContains("Total time for foo", null, out);
     assertNotContains("Defect StatEvents", out);
@@ -67,13 +73,18 @@ public class AdvancedStatisticsTest {
 
   @Test
   public void track() {
+    StringBuilder sb = new StringBuilder();
+    as.addOutputStrategy(
+        new StatOutputStrategy(() -> "Total time for foo: $time.sum$\nTest: $test.value.hist$\n")
+            .addOutputWriter(s -> sb.append(s)));
     as.startTracking();
     for (int i = 0; i < 9; i++) {
       as.track("Test", (i % 2 == 0 ? "A" : "B"));
     }
     as.stopTracking();
-    String out = as.baseStorage.toString();
+    as.printStatistics();
 
+    String out = sb.toString();
     assertFalse("PrintStream is empty!", out.isEmpty());
     assertContains("Total time for foo", null, out);
     assertContains("Test", "[A x 5, B x 4]", out);
@@ -82,18 +93,23 @@ public class AdvancedStatisticsTest {
 
   @Test
   public void openclose() throws InterruptedException {
+    StringBuilder sb = new StringBuilder();
+    as.addOutputStrategy(
+        new StatOutputStrategy(
+            () -> "Total time for foo: $time.sum$\n"
+                + "Counter for Test: $test.count$\n"
+                + "AVG for Test: $test.time.avg$\n"
+                + "SUM for Test: $test.time.sum$\n").addOutputWriter(s -> sb.append(s)));
     as.startTracking();
     for (int i = 0; i < 9; i++) {
       StatEvent t = as.open("Test");
-      t.storage.setPrintFormat(StatKind.COUNT, "Counter for Test");
-      t.storage.setPrintFormat(StatKind.AVG, "AVG for Test");
-      t.storage.setPrintFormat(StatKind.SUM, "SUM for Test");
       Thread.sleep(2);
       as.close(t);
     }
     as.stopTracking();
-    String out = as.baseStorage.toString();
+    as.printStatistics();
 
+    String out = sb.toString();
     assertFalse("PrintStream is empty!", out.isEmpty());
     assertContains("Total time for foo", null, out);
     assertContains("Counter for Test", "9", out);
@@ -104,6 +120,11 @@ public class AdvancedStatisticsTest {
 
   @Test
   public void openclose_multiple() throws InterruptedException {
+    StringBuilder sb = new StringBuilder();
+    as.addOutputStrategy(
+        new StatOutputStrategy(
+            () -> "Total time for foo: $time.sum$\n"
+                + "Counter for Test: $test.count$\n").addOutputWriter(s -> sb.append(s)));
     as.startTracking();
     ExecutorService es = Executors.newCachedThreadPool();
     es.execute(new TestWorker(18, 5));
@@ -112,9 +133,6 @@ public class AdvancedStatisticsTest {
     es.shutdown();
 
     StatEvent t = as.open("Test");
-    t.storage.setPrintFormat(StatKind.COUNT, "Counter for Test");
-    t.storage.setPrintFormat(StatKind.AVG, "AVG for Test");
-    t.storage.setPrintFormat(StatKind.SUM, "SUM for Test");
     Thread.sleep(2);
     as.close(t);
 
@@ -122,8 +140,9 @@ public class AdvancedStatisticsTest {
     assertTrue("Time elapsed before all workers terminated.", terminated);
 
     as.stopTracking();
-    String out = as.baseStorage.toString();
+    as.printStatistics();
 
+    String out = sb.toString();
     assertFalse("PrintStream is empty!", out.isEmpty());
     assertContains("Total time for foo", null, out);
     assertContains("Counter for Test", "29", out);
