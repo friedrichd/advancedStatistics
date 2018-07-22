@@ -16,37 +16,44 @@
  *  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
  *  See the License for the specific language governing permissions and
  *  limitations under the License.
- *
- *
- *  CPAchecker web page:
- *    http://cpachecker.sosy-lab.org
  */
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
-import com.google.common.collect.ConcurrentHashMultiset;
-import com.google.common.collect.Multiset;
-import java.time.Duration;
-import org.sosy_lab.cpachecker.util.statistics.StatKind;
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Set;
 
-public class ValueOnlyStorage extends AbstractStatStorage {
+/** Stores all objects in a list. Therefore all values and there order is saved. */
+public class ListStatStorage implements StatStorageStrategy {
 
-  private final Multiset<Object> hist = ConcurrentHashMultiset.create();
+  private static Set<String> methods = new HashSet<>();
+  static {
+    methods.add("list");
+    methods.add("count");
+  }
 
-  public ValueOnlyStorage(String label) {
-    super(label);
+  private List<Object> list = Collections.synchronizedList(new ArrayList<>());
+
+  @Override
+  public void update(Object obj) {
+    list.add(obj);
   }
 
   @Override
-  public synchronized void update(Duration duration, Object value) {
-    if (value != null) {
-      hist.add(value);
+  public Set<String> getMethods() {
+    return methods;
+  }
+
+  @Override
+  public Object get(String method) {
+    if (method.equals("list")) {
+      return Collections.unmodifiableList(list);
+    } else if (method.equals("count")) {
+      return list.size();
     }
-  }
-
-  @Override
-  public String getPrintableStatistics(StatKind type) {
-    return hist.toString();
+    return null;
   }
 
 }
-

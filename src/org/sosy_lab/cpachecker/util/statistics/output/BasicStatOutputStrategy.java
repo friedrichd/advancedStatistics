@@ -55,7 +55,7 @@ public class BasicStatOutputStrategy extends StatOutputStrategy implements Stati
 
   @Override
   public void printStatistics(PrintStream out, Result result, UnmodifiableReachedSet reached) {
-    out.print(replaceVariables(storage.toMap()));
+    out.print(replaceVariables(storage.getVariableMap()));
   }
 
 }

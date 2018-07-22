@@ -27,6 +27,7 @@ import java.io.IOException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -128,22 +129,26 @@ public class StatOutputStrategy {
    * @param mapping A mapping of variables and replacement objects
    */
   public String replaceVariables(Map<String, Object> mapping) {
+    Map<String, Object> map = new HashMap<>();
     for (Entry<String, Object> entry : mapping.entrySet()) {
       Object obj = entry.getValue();
       if(obj instanceof Duration){
         obj = TimeSpan.ofMillis(((Duration) obj).toMillis());
-        mapping.put(entry.getKey(), obj);
       } else if (obj instanceof Number) {
         String tmp = String.format("%.2f", ((Number) obj).doubleValue());
-        obj = tmp.endsWith(".00") ? tmp.substring(0, tmp.length() - 3) : tmp;
-        mapping.put(entry.getKey(), obj);
+        obj = tmp.endsWith(".00") || tmp.endsWith(",00") ? tmp.substring(0, tmp.length() - 3) : tmp;
       }
-      mapping.putIfAbsent(StatisticsUtils.escape(entry.getKey()), obj);
+      String escapedKey = StatisticsUtils.escape(entry.getKey());
+      if (!mapping.keySet().contains(escapedKey)) {
+        map.putIfAbsent(escapedKey, obj);
+      } else {
+        map.put(entry.getKey(), obj);
+      }
     }
     Matcher m = Pattern.compile("\\$([A-Za-z0-9_\\.]+)\\$").matcher(getTemplate());
     StringBuffer sb = new StringBuffer();
     while (m.find()) {
-      Object obj = mapping.get(StatisticsUtils.escape(m.group(1)));
+      Object obj = map.get(StatisticsUtils.escape(m.group(1)));
       if (obj != null) {
         m.appendReplacement(sb, obj.toString());
       }

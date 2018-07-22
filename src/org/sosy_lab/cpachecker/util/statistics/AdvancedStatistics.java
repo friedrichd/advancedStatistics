@@ -47,6 +47,7 @@ import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
 import org.sosy_lab.cpachecker.util.statistics.output.BasicStatOutputStrategy;
 import org.sosy_lab.cpachecker.util.statistics.output.StatOutputStrategy;
 import org.sosy_lab.cpachecker.util.statistics.storage.StatStorage;
+import org.sosy_lab.cpachecker.util.statistics.storage.StatStorageStrategy;
 
 /**
  * A class to output statistics and results of an analysis in an advanced way.</br>
@@ -301,7 +302,7 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
     return null;
   }
 
-  private StatStorage getCurrentStorage() {
+  private StatStorageStrategy getCurrentStorage() {
     long id = Thread.currentThread().getId();
     if (openEvents.containsKey(id) && !openEvents.get(id).isEmpty()) {
       return openEvents.get(id).getFirst().storage;
@@ -339,12 +340,12 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
   public static class StatEvent {
 
     private final String label;
-    private final StatStorage storage;
+    private final StatStorageStrategy storage;
     private final Duration start_time;
     private Object value = null;
     private boolean stored = false;
 
-    public StatEvent(String label, Duration start_time, StatStorage storage) {
+    public StatEvent(String label, Duration start_time, StatStorageStrategy storage) {
       this.label = label;
       this.start_time = start_time;
       this.storage = storage;
@@ -355,7 +356,7 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
      *
      * @param value An additional value
      */
-    public StatEvent setValue(Object value) {
+    public synchronized StatEvent setValue(Object value) {
       this.value = value;
       return this;
     }
@@ -384,9 +385,11 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
       if (end_time == null || start_time.compareTo(end_time) > 0) {
         store();
       } else if(value == null){
-        storage.update(end_time.minus(start_time));
+        storage.update();
+        storage.getSubStorage("time").update(end_time.minus(start_time));
       } else {
-        storage.update(end_time.minus(start_time), value);
+        storage.update(value);
+        storage.getSubStorage("time").update(end_time.minus(start_time));
       }
       stored = true;
       return this;
