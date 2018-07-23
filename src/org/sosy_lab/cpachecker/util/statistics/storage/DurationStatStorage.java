@@ -72,8 +72,8 @@ public class DurationStatStorage implements StatStorageStrategy {
   public String toString() {
     return String.format(
         "%s (count: %2d, avg: %s, max: %s)",
-        get("count"),
         get("sum").toString().trim(),
+        get("count"),
         get("avg").toString().trim(),
         get("max").toString().trim());
   }
