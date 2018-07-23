@@ -19,35 +19,40 @@
  */
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Set;
 
+/** Interface for all nodes that provide printable values. */
 public interface StatStorageStrategy {
 
-  public default Set<String> getMethods(){
+  /** Returns all available terminal methods. */
+  public default Set<String> getMethods() {
     return Collections.emptySet();
   }
 
-  public default Set<String> getSubStorages() {
-    return Collections.emptySet();
+  /** Validates if the given path could be stored. */
+  public default boolean isValidPath(String path) {
+    return path == null || path.isEmpty() || path.equals(".") || getMethods().contains(path);
   }
 
-  public Object get(String method);
+  /** Returns the inner or terminal node identified by this path. */
+  public Object get(String path);
 
-  public default StatStorageStrategy getSubStorage(@SuppressWarnings("unused") String path) {
-    return null;
-  }
-
+  /** Updates a node with no value. */
   public default void update() {}
 
+  /** Updates a node with an object value. */
   public void update(Object obj);
 
+  /** Returns a map of all available values. */
   public default Map<String, Object> getVariableMap() {
     return getVariableMap("");
   }
 
+  /** Returns a map of all available values and puts a prefix in front of all keys. */
   public default Map<String, Object> getVariableMap(String prefix) {
     Map<String, Object> result = new HashMap<>();
     if (prefix == null) {
@@ -56,12 +61,18 @@ public interface StatStorageStrategy {
       prefix += ".";
     }
     for (String key : getMethods()) {
-      result.put(prefix + key, get(key));
-    }
-    for (String key : getSubStorages()) {
-      StatStorageStrategy child = getSubStorage(key);
-      if (child != null) {
-        result.putAll(child.getVariableMap(prefix + key));
+      Object obj = get(key);
+      if (obj != null) {
+        result.put(prefix + key, obj);
+        if (obj instanceof StatStorageStrategy) {
+          result.putAll(((StatStorageStrategy) obj).getVariableMap(prefix + key));
+        } else if (obj instanceof Collection<?>) {
+          for (Object part : ((Collection<?>) obj)) {
+            if (part instanceof StatStorageStrategy) {
+              result.putAll(((StatStorageStrategy) part).getVariableMap(prefix + key));
+            }
+          }
+        }
       }
     }
     return result;

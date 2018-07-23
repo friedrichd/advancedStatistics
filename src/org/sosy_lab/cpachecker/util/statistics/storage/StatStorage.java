@@ -23,78 +23,105 @@
  */
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
+import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.atomic.LongAdder;
+import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
 
-/** Stores and displays labeled durations and values (of statistic events) in a hierarchical way. */
+/**
+ * Stores and displays labeled durations and values (of statistic events) in a hierarchical
+ * way.</br>
+ * <b>Terminal operators:</b> count
+ */
 public class StatStorage implements StatStorageStrategy {
+
+  private static final Set<String> methods = new HashSet<>();
+  public static List<Class<? extends StatStorageStrategy>> VALUETYPES = new ArrayList<>();
+  static {
+    methods.add("count");
+    methods.add("value");
+    methods.add("time");
+    VALUETYPES.add(NumberStatStorage.class);
+    VALUETYPES.add(ObjectStatStorage.class);
+    VALUETYPES.add(ListStatStorage.class);
+  }
 
   // labeled, ordered list of all sub-storages
   private final Map<String, StatStorage> children =
       Collections.synchronizedMap(new LinkedHashMap<>());
-  // storage for duration and value
-  private StatStorageStrategy storeDuration = null, storeValue = null;
 
+  // storage for duration and value
+  private StatStorageStrategy storeDuration = null;
+  private List<StatStorageStrategy> storeValue = new ArrayList<>();
   // counter for events
   private LongAdder countEvents = new LongAdder();
 
-  @SuppressWarnings("unused")
-  public void createVariables(Set<String> variables) {
-    // TODO Auto-generated method stub
-  }
-
-  @Override
-  public Set<String> getMethods() {
-    return Collections.singleton("count");
-  }
-
-  @Override
-  public Set<String> getSubStorages() {
-    Set<String> res = new HashSet<>(children.keySet());
-    res.add("time");
-    res.add("value");
-    return res;
-  }
-
-  @Override
-  public Object get(String path) {
-    if (path.equals("count")) {
-      return countEvents.intValue();
-    } else {
-      String prefix = path.contains(".") ? path.substring(0, path.indexOf(".")) : path;
-      String rest = path.substring(prefix.length());
-      return getSubStorage(prefix).get(rest);
+  public void createVariables(Collection<String> variables) {
+    for (String path : variables) {
+      if (path.contains("value.")) {
+        String[] split = path.split("value\\.", 2);
+        if (split.length > 1 && split[1] != null && !split[1].isEmpty()) {
+          StatStorage innerNode = getSubStorage(split[0]);
+          boolean success = false;
+          for (StatStorageStrategy oldStrategy : innerNode.storeValue) {
+            if (oldStrategy.isValidPath(split[1])) {
+              success = true;
+              break;
+            }
+          }
+          if (success) {
+            continue;
+          }
+          for (Class<? extends StatStorageStrategy> c : VALUETYPES) {
+            if (innerNode.storeValue.stream().noneMatch(s -> s.getClass().equals(c))) {
+            try {
+                StatStorageStrategy newStrategy = c.getConstructor().newInstance();
+                if (newStrategy.isValidPath(split[1])) {
+                  success = true;
+                  innerNode.storeValue.add(newStrategy);
+                  break;
+                }
+            } catch (InstantiationException | IllegalAccessException | IllegalArgumentException
+                | InvocationTargetException | NoSuchMethodException | SecurityException e) {
+              e.printStackTrace();
+              }
+            }
+          }
+        }
+      }
     }
   }
+
 
   /**
    * Finds a sub-storage (child) by name or creates a new sub-storage, if the name doesn't exist.
    *
-   * @param label The name of the sub-storage
+   * @param label The name of the sub-storage (not "time" or "value")
    */
-  @Override
-  public synchronized StatStorageStrategy getSubStorage(String label) {
-    if (label.equals("time")) {
-      if (storeDuration == null) {
-        storeDuration = new DurationStatStorage();
-      }
-      return storeDuration;
-    } else if (label.equals("value")) {
-      if (storeValue == null) {
-        storeValue = new ObjectStatStorage();
-      }
-      return storeValue;
-    } else if (children.containsKey(label)) {
-      return children.get(label);
+  public synchronized StatStorage getSubStorage(String label) {
+    if (label == null || label.isEmpty() || label.equals(".")) {
+      return this;
+    }
+    String prefix = label.contains(".") ? label.substring(0, label.indexOf(".")) : label;
+    String escaped = StatisticsUtils.escape(prefix);
+    String rest = label.substring(prefix.length());
+    assert !getMethods().contains(escaped) : String
+        .format("The label \"%s\" is already used as a method.", prefix);
+    if (children.containsKey(escaped)) {
+      return children.get(escaped).getSubStorage(rest);
     } else {
       StatStorage newChild = new StatStorage();
-      children.put(label, newChild);
-      return newChild;
+      children.put(escaped, newChild);
+      return newChild.getSubStorage(rest);
     }
   }
 
@@ -110,11 +137,8 @@ public class StatStorage implements StatStorageStrategy {
    * @param duration The duration of the event
    */
   public void update(Duration duration) {
-    countEvents.increment();
-    if (storeDuration == null) {
-      storeDuration = new DurationStatStorage();
-    }
-    storeDuration.update(duration);
+    update();
+    updateDuration(duration);
   }
 
   /**
@@ -124,11 +148,8 @@ public class StatStorage implements StatStorageStrategy {
    */
   @Override
   public void update(Object value) {
-    countEvents.increment();
-    if (storeValue == null) {
-      storeValue = new ObjectStatStorage();
-    }
-    storeValue.update(value);
+    update();
+    updateValue(value);
   }
 
   /**
@@ -138,17 +159,56 @@ public class StatStorage implements StatStorageStrategy {
    * @param value An additional value of the event for categorization
    */
   public void update(Duration duration, Object value) {
-    countEvents.increment();
+    update();
+    updateDuration(duration);
+    updateValue(value);
+  }
+
+  private void updateDuration(Duration duration) {
     if (storeDuration == null) {
       storeDuration = new DurationStatStorage();
     }
     storeDuration.update(duration);
+  }
 
-    if (storeValue == null) {
-      storeValue = new ObjectStatStorage();
+  private void updateValue(Object value) {
+    if (storeValue.isEmpty()) {
+      storeValue.add(new ObjectStatStorage());
     }
-    storeValue.update(value);
-    // getChild(value.toString()).update(duration);
+    storeValue.forEach(store -> store.update(value));
+  }
+
+  @Override
+  public Set<String> getMethods() {
+    return methods;
+  }
+
+  @Override
+  public Object get(String path) {
+    if (path == null || path.isEmpty() || path.equals(".")) {
+      return this;
+    }
+    String prefix = path.contains(".") ? path.substring(0, path.indexOf(".")) : path;
+    String rest = path.substring(prefix.length());
+    switch (StatisticsUtils.escape(prefix)) {
+      case "count":
+        return countEvents.intValue();
+      case "time":
+        return storeDuration == null ? null : storeDuration.get(rest);
+      case "value":
+        return storeValue.isEmpty() ? null : storeValue;
+      default:
+        return getSubStorage(prefix).get(rest);
+    }
+  }
+
+  @Override
+  public Map<String, Object> getVariableMap(String prefix) {
+    Map<String, Object> result = StatStorageStrategy.super.getVariableMap(prefix);
+    for (Entry<String, StatStorage> entry : children.entrySet()) {
+      result.putAll(entry.getValue().getVariableMap(prefix + entry.getKey()));
+    }
+    return result;
   }
 
   /** Returns the amount of processed <code>update</code> calls. */

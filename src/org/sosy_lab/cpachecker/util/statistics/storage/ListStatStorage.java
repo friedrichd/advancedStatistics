@@ -25,10 +25,13 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Stores all objects in a list. Therefore all values and there order is saved. */
+/**
+ * Stores all objects in a list. Therefore all values and there order is saved.</br>
+ * <b>Terminal operators:</b> count, list
+ */
 public class ListStatStorage implements StatStorageStrategy {
 
-  private static Set<String> methods = new HashSet<>();
+  private static final Set<String> methods = new HashSet<>();
   static {
     methods.add("list");
     methods.add("count");
@@ -48,12 +51,20 @@ public class ListStatStorage implements StatStorageStrategy {
 
   @Override
   public Object get(String method) {
-    if (method.equals("list")) {
+    if (method == null || method.isEmpty() || method.equals(".")) {
+      return this;
+    } else if (method.equals("list")) {
       return Collections.unmodifiableList(list);
     } else if (method.equals("count")) {
       return list.size();
+    } else {
+      return null;
     }
-    return null;
+  }
+
+  @Override
+  public String toString() {
+    return list.toString();
   }
 
 }

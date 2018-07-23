@@ -28,7 +28,10 @@ import java.util.Set;
 import java.util.concurrent.TimeUnit;
 import org.sosy_lab.common.time.TimeSpan;
 
-/** Works like a {@link NumberStatStorage}, but allows to work with TimeSpan and Duration. */
+/**
+ * Works like a {@link NumberStatStorage}, but allows to work with TimeSpan and Duration.</br>
+ * <b>Terminal operators:</b> all from {@link NumberStatStorage}
+ */
 public class DurationStatStorage implements StatStorageStrategy {
 
   NumberStatStorage ns = new NumberStatStorage();
@@ -51,6 +54,9 @@ public class DurationStatStorage implements StatStorageStrategy {
 
   @Override
   public Object get(String method) {
+    if (method == null || method.isEmpty() || method.equals(".")) {
+      return this;
+    }
     Object ret = ns.get(method);
     if (ret != null
         && !method.equals("count")
@@ -60,6 +66,16 @@ public class DurationStatStorage implements StatStorageStrategy {
     } else {
       return ret;
     }
+  }
+
+  @Override
+  public String toString() {
+    return String.format(
+        "%s (count: %2d, avg: %s, max: %s)",
+        get("count"),
+        get("sum").toString().trim(),
+        get("avg").toString().trim(),
+        get("max").toString().trim());
   }
 
 }

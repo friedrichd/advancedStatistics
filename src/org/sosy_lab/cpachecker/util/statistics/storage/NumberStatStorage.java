@@ -25,15 +25,20 @@ import java.util.concurrent.atomic.DoubleAccumulator;
 import java.util.concurrent.atomic.DoubleAdder;
 import java.util.concurrent.atomic.LongAdder;
 
+/**
+ * Storage for aggregated number values</br>
+ * <b>Terminal operators:</b> count, sum, min, max, avg/mean and std (deviation)
+ */
 public class NumberStatStorage implements StatStorageStrategy {
 
-  private static Set<String> methods = new HashSet<>();
+  private static final Set<String> methods = new HashSet<>();
   static {
     methods.add("count");
     methods.add("sum");
     methods.add("min");
     methods.add("max");
     methods.add("avg");
+    methods.add("mean");
     methods.add("std");
   }
 
@@ -61,6 +66,9 @@ public class NumberStatStorage implements StatStorageStrategy {
 
   @Override
   public Object get(String method) {
+    if (method == null || method.isEmpty() || method.equals(".")) {
+      return this;
+    }
     switch (method) {
       case "count":
         return count.intValue();
@@ -71,6 +79,7 @@ public class NumberStatStorage implements StatStorageStrategy {
       case "max":
         return max.doubleValue();
       case "avg":
+      case "mean":
         return count.intValue() > 0 ? sum.doubleValue() / count.doubleValue() : Double.NaN;
       case "std":
         return count.intValue() > 0
@@ -81,6 +90,17 @@ public class NumberStatStorage implements StatStorageStrategy {
       default:
         return null;
     }
+  }
+
+  @Override
+  public String toString() {
+    return String.format(
+        "%.0f (count: %2d, min: %2.0f, max: %2.0f, avg: %2.2f)",
+        get("sum"),
+        get("count"),
+        get("min"),
+        get("max"),
+        get("avg"));
   }
 
 }

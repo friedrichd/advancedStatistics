@@ -27,22 +27,29 @@ import com.google.common.collect.ConcurrentHashMultiset;
 import com.google.common.collect.Multiset;
 import java.util.HashSet;
 import java.util.Set;
+import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
 
 /** Stores objects and their amount, but ignores their order. */
+
+/**
+ * Storage for object values and their amount (order will be ignored)</br>
+ * <b>Terminal operators:</b> count, distinct (count), &lt;value&gt; (count of this value)
+ */
 public class ObjectStatStorage implements StatStorageStrategy {
 
-  private static Set<String> methods = new HashSet<>();
-  static {
-    methods.add("hist");
+  private final Set<String> methods = new HashSet<>();
+  {
     methods.add("count");
+    methods.add("distinct");
+    methods.add("hist");
   }
-
   private final Multiset<Object> hist = ConcurrentHashMultiset.create();
 
   @Override
   public void update(Object value) {
     if (value != null) {
       hist.add(value);
+      methods.add(StatisticsUtils.escape(value.toString()));
     }
   }
 
@@ -52,21 +59,37 @@ public class ObjectStatStorage implements StatStorageStrategy {
   }
 
   @Override
+  public boolean isValidPath(String path) {
+    boolean result = path == null || !path.contains(".") || path.equals(".");
+    if (result) {
+      methods.add(StatisticsUtils.escape(path));
+    }
+    return result;
+  }
+
+  @Override
   public Object get(String method) {
-    if (method.equals("hist")) {
-      return hist;
+    if (method == null || method.isEmpty() || method.equals(".")) {
+      return this;
     } else if (method.equals("count")) {
       return hist.size();
+    } else if (method.equals("hist")) {
+      return hist;
+    } else if (method.equals("distinct")) {
+      return hist.elementSet().size();
+    } else {
+      for (Object obj : hist.elementSet()) {
+        if (method.equals(StatisticsUtils.escape(obj.toString()))) {
+          return hist.count(obj);
+        }
+      }
+      return 0;
     }
-    return null;
   }
 
-  public int getTimesWithValue(Object value) {
-    return hist.count(value);
-  }
-
-  public Set<Object> getValues() {
-    return hist.elementSet();
+  @Override
+  public String toString() {
+    return hist.toString();
   }
 
 }
