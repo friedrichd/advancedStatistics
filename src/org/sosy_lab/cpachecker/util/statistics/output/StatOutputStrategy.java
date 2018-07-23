@@ -150,7 +150,7 @@ public class StatOutputStrategy {
     while (m.find()) {
       Object obj = map.get(StatisticsUtils.escape(m.group(1)));
       if (obj != null) {
-        m.appendReplacement(sb, obj.toString());
+        m.appendReplacement(sb, obj.toString().trim());
       }
     }
     m.appendTail(sb);

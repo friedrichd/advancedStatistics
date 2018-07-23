@@ -58,7 +58,7 @@ public class StatisticsUtils {
    * @param raw A string
    */
   public static String escape(String raw) {
-    return String.join(".", raw.toLowerCase().split("\\.+"));
+    return String.join(".", raw.toLowerCase().replaceAll("\\s", "").split("\\.+"));
   }
 
   public static void write(PrintStream target, int indentLevel, int outputNameColWidth,
