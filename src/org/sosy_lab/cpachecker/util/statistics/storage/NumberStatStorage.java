@@ -39,8 +39,8 @@ public class NumberStatStorage implements StatStorageStrategy {
 
   private LongAdder count = new LongAdder();
   private DoubleAdder sum = new DoubleAdder(), sum_squared = new DoubleAdder();
-  private DoubleAccumulator min = new DoubleAccumulator(Math::min, Double.MAX_VALUE);
-  private DoubleAccumulator max = new DoubleAccumulator(Math::max, Double.MIN_VALUE);
+  private DoubleAccumulator min = new DoubleAccumulator(Math::min, Double.POSITIVE_INFINITY);
+  private DoubleAccumulator max = new DoubleAccumulator(Math::max, Double.NEGATIVE_INFINITY);
 
   @Override
   public void update(Object obj) {
