@@ -44,8 +44,8 @@ import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
  */
 public class StatStorage implements StatStorageStrategy {
 
-  private static final Set<String> methods = new HashSet<>();
-  public static List<Class<? extends StatStorageStrategy>> VALUETYPES = new ArrayList<>();
+  static final Set<String> methods = new HashSet<>();
+  static final List<Class<? extends StatStorageStrategy>> VALUETYPES = new ArrayList<>();
   static {
     methods.add("count");
     methods.add("value");
