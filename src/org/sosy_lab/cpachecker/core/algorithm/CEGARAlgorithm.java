@@ -109,16 +109,16 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       new AdvancedStatistics("CEGAR algorithm").addBasicTemplate(() -> {
         StringBuilder sb = new StringBuilder();
         StatisticsUtils.write(sb, "Number of refinements", "$refinement.count$");
-        StatisticsUtils.write(sb, "Number of successful refinements", "$refinement.true.count$");
-        StatisticsUtils.write(sb, "Number of failed refinements", "$refinement.false.count$");
+        StatisticsUtils.write(sb, "Number of successful refinements", "$refinement.value.true$");
+        StatisticsUtils.write(sb, "Number of failed refinements", "$refinement.value.false$");
         StatisticsUtils
             .write(sb, "Max. size of reached set before ref.", "$reachedSetBefore.value.max$");
         StatisticsUtils
-            .write(sb, "Max. size of reached set after ref.", "$reachedAfterBefore.value.max$");
+            .write(sb, "Max. size of reached set after ref.", "$reachedSetAfter.value.max$");
         StatisticsUtils
             .write(sb, "Avg. size of reached set before ref.", "$reachedSetBefore.value.avg$");
         StatisticsUtils
-            .write(sb, "Avg. size of reached set after ref.", "$reachedAfterBefore.value.avg$");
+            .write(sb, "Avg. size of reached set after ref.", "$reachedSetAfter.value.avg$");
         sb.append(System.lineSeparator());
         StatisticsUtils
             .write(sb, "Total time for CEGAR algorithm", "$time.sum$");
@@ -304,7 +304,6 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
   }
 
   private boolean refinementNecessary(ReachedSet reached, AbstractState previousLastState) {
-    StatEvent stat_eval = stats2.open("Evaluating necessity of refinement");
     boolean rValue;
     if (globalRefinement) {
       // check other states
@@ -317,7 +316,6 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       rValue = !Objects.equals(reached.getLastState(), previousLastState)
           && isTargetState(reached.getLastState());
     }
-    stats2.close(stat_eval, rValue);
     return rValue;
   }
 
@@ -331,7 +329,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
 
     stats.refinementTimer.start();
 
-    stats2.track("Size of reached set before ref.", reached.size());
+    stats2.track("ReachedSetBefore", reached.size());
     StatEvent stat_refine = stats2.open("Refinement");
     boolean refinementResult = false;
     try {
@@ -351,7 +349,7 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       stats.countSuccessfulRefinements++;
       stats.totalReachedSizeAfterRefinement += reached.size();
       stats.maxReachedSizeAfterRefinement = Math.max(stats.maxReachedSizeAfterRefinement, reached.size());
-      stats2.track("Size of reached set after ref.", reached.size());
+      stats2.track("ReachedSetAfter", reached.size());
     }
 
     return refinementResult;
