@@ -33,7 +33,9 @@ import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
 
 /**
  * Storage for object values and their amount (order will be ignored)</br>
- * <b>Terminal operators:</b> count, distinct (count), &lt;value&gt; (count of this value)
+ * <b>Terminal operators:</b> count, distinct (count), hist (all values and their amount),
+ * &lt;value&gt; + _count/_perc/_both (count and/or percentage of this value)
+ *
  */
 public class ObjectStatStorage implements StatStorageStrategy {
 
@@ -60,7 +62,13 @@ public class ObjectStatStorage implements StatStorageStrategy {
 
   @Override
   public boolean isValidPath(String path) {
-    boolean result = path == null || !path.contains(".") || path.equals(".");
+    boolean result =
+        path == null
+            || !path.contains(".")
+            || path.equals(".")
+            || path.endsWith("_count")
+            || path.endsWith("_perc")
+            || path.endsWith("_both");
     if (result) {
       methods.add(StatisticsUtils.escape(path));
     }
@@ -77,14 +85,31 @@ public class ObjectStatStorage implements StatStorageStrategy {
       return hist;
     } else if (method.equals("distinct")) {
       return hist.elementSet().size();
-    } else {
+    } else if (method.contains("_")) {
+      String value = method.substring(0, method.lastIndexOf("_"));
+      String type = method.substring(method.lastIndexOf("_") + 1);
       for (Object obj : hist.elementSet()) {
-        if (method.equals(StatisticsUtils.escape(obj.toString()))) {
-          return hist.count(obj);
+        if (value.equals(StatisticsUtils.escape(obj.toString()))) {
+          switch (type) {
+            case "count":
+              return hist.count(obj);
+            case "perc":
+              return StatisticsUtils.toPercent(hist.count(obj), hist.size());
+            case "both":
+              return StatisticsUtils.valueWithPercentage(hist.count(obj), hist.size());
+          }
         }
       }
-      return 0;
+      switch (type) {
+        case "count":
+          return 0;
+        case "perc":
+          return StatisticsUtils.toPercent(0, 1);
+        case "both":
+          return StatisticsUtils.valueWithPercentage(0, 1);
+      }
     }
+    return null;
   }
 
   @Override

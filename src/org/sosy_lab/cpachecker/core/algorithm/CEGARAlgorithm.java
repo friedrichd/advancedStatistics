@@ -109,8 +109,9 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       new AdvancedStatistics("CEGAR algorithm").addBasicTemplate(() -> {
         StringBuilder sb = new StringBuilder();
         StatisticsUtils.write(sb, "Number of refinements", "$refinement.count$");
-        StatisticsUtils.write(sb, "Number of successful refinements", "$refinement.value.true$");
-        StatisticsUtils.write(sb, "Number of failed refinements", "$refinement.value.false$");
+        StatisticsUtils
+            .write(sb, "Number of successful refinements", "$refinement.value.true_count$");
+        StatisticsUtils.write(sb, "Number of failed refinements", "$refinement.value.false_count$");
         StatisticsUtils
             .write(sb, "Max. size of reached set before ref.", "$reachedSetBefore.value.max$");
         StatisticsUtils
