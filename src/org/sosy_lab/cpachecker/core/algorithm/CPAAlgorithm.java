@@ -67,8 +67,11 @@ import org.sosy_lab.cpachecker.exceptions.CPAException;
 import org.sosy_lab.cpachecker.util.AbstractStates;
 import org.sosy_lab.cpachecker.util.Pair;
 import org.sosy_lab.cpachecker.util.statistics.AbstractStatValue;
+import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics;
+import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics.StatEvent;
 import org.sosy_lab.cpachecker.util.statistics.StatCounter;
 import org.sosy_lab.cpachecker.util.statistics.StatInt;
+import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
 import org.sosy_lab.cpachecker.util.statistics.StatisticsWriter;
 
 public class CPAAlgorithm implements Algorithm, StatisticsProvider {
@@ -190,6 +193,36 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
   private final ForcedCovering forcedCovering;
 
   private final CPAStatistics               stats = new CPAStatistics();
+  private final AdvancedStatistics stats2 =
+      new AdvancedStatistics("CPA algorithm").addBasicTemplate(() -> {
+        StringBuilder sb = new StringBuilder();
+        StatisticsUtils.write(sb, "Number of iterations", "$sizeofwaitlist.count$");
+
+        StatisticsUtils.write(sb, "Max size of waitlist", "$sizeofwaitlist.value.max$");
+        StatisticsUtils.write(sb, "Average size of waitlist", "$sizeofwaitlist.value.avg$");
+
+        /*StatisticsWriter w = StatisticsWriter.writingStatisticsTo(out);
+        for (AbstractStatValue c : reachedSetStatistics.values()) {
+          w.put(c);
+        }*/
+        StatisticsUtils.write(sb, "Number of computed successors", "$successors.value.sum$");
+        StatisticsUtils.write(sb, "Max successors for one state", "$successors.value.max$");
+        StatisticsUtils.write(sb, "Number of times merged", "$merge.value.merged_both$");
+        StatisticsUtils.write(sb, "Number of times stopped", "$stopped.count$");
+        StatisticsUtils.write(sb, "Number of times breaked", "$breaked.count$");
+        sb.append(System.lineSeparator());
+
+        StatisticsUtils.write(sb, "Total time for CPA algorithm", "$time.sum$ (max: $time.max$)");
+        StatisticsUtils.write(sb, 1, 50, "Time for choose from waitlist", "$choose.time$");
+        StatisticsUtils
+            .writeIfExists(sb, 1, 50, "Time for forced covering", "$forcedcovering.time$");
+        StatisticsUtils.write(sb, 1, 50, "Time for precision adjustment", "$precision.time$");
+        StatisticsUtils.write(sb, 1, 50, "Time for transfer relation", "$transfer.time$");
+        StatisticsUtils.write(sb, 1, 50, "Time for merge operator", "$merge.time$");
+        StatisticsUtils.write(sb, 1, 50, "Time for stop operator", "$stop.time$");
+        StatisticsUtils.write(sb, 1, 50, "Time for adding to reached set", "$add.time$");
+        return sb.toString();
+      });
 
   private final TransferRelation transferRelation;
   private final MergeOperator mergeOperator;
@@ -220,9 +253,11 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
   @Override
   public AlgorithmStatus run(final ReachedSet reachedSet) throws CPAException, InterruptedException {
     stats.totalTimer.start();
+    stats2.startTracking();
     try {
       return run0(reachedSet);
     } finally {
+      stats2.stopTracking();
       stats.totalTimer.stopIfRunning();
       stats.chooseTimer.stopIfRunning();
       stats.precisionTimer.stopIfRunning();
@@ -281,10 +316,13 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
         stats.maxWaitlistSize = size;
       }
       stats.countWaitlistSize += size;
+      stats2.track("SizeOfWaitlist", reachedSet.getWaitlist().size());
 
       stats.chooseTimer.start();
+      StatEvent chooseTimer = stats2.open("Choose");
       final AbstractState state = reachedSet.popFromWaitlist();
       final Precision precision = reachedSet.getPrecision(state);
+      stats2.close(chooseTimer);
       stats.chooseTimer.stop();
 
       logger.log(Level.FINER, "Retrieved state from waitlist");
@@ -319,6 +357,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
 
     if (forcedCovering != null) {
       stats.forcedCoveringTimer.start();
+      StatEvent forcedCoveringTimer = stats2.open("forcedCovering");
       try {
         boolean stop = forcedCovering.tryForcedCovering(state, precision, reachedSet);
 
@@ -327,15 +366,18 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
           return false;
         }
       } finally {
+        stats2.close(forcedCoveringTimer);
         stats.forcedCoveringTimer.stop();
       }
     }
 
     stats.transferTimer.start();
+    StatEvent transferTimer = stats2.open("Transfer");
     Collection<? extends AbstractState> successors;
     try {
       successors = transferRelation.getAbstractSuccessors(state, precision);
     } finally {
+      stats2.close(transferTimer);
       stats.transferTimer.stop();
     }
     // TODO When we have a nice way to mark the analysis result as incomplete,
@@ -343,6 +385,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
 
     int numSuccessors = successors.size();
     logger.log(Level.FINER, "Current state has", numSuccessors, "successors");
+    stats2.track("Successors", numSuccessors);
     stats.countSuccessors += numSuccessors;
     stats.maxSuccessors = Math.max(numSuccessors, stats.maxSuccessors);
 
@@ -353,6 +396,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       logger.log(Level.ALL, "Successor of", state, "\nis", successor);
 
       stats.precisionTimer.start();
+      StatEvent precisionTimer = stats2.open("Precision");
       PrecisionAdjustmentResult precAdjustmentResult;
       try {
         Optional<PrecisionAdjustmentResult> precAdjustmentOptional =
@@ -364,6 +408,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
         precAdjustmentResult = precAdjustmentOptional.get();
       } finally {
         stats.precisionTimer.stop();
+        stats2.close(precisionTimer);
       }
 
       successor = precAdjustmentResult.abstractState();
@@ -371,12 +416,14 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       Action action = precAdjustmentResult.action();
 
       if (action == Action.BREAK) {
+        StatEvent stopTimer = stats2.open("Stop");
         stats.stopTimer.start();
         boolean stop;
         try {
           stop = stopOperator.stop(successor, reachedSet.getReached(successor), successorPrecision);
         } finally {
           stats.stopTimer.stop();
+          stats2.close(stopTimer);
         }
 
         if (AbstractStates.isTargetState(successor) && stop) {
@@ -384,11 +431,13 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
           // no need to call merge and stop either, so just ignore this state
           // and handle next successor
           stats.countStop++;
+          stats2.track("stopped");
           logger.log(Level.FINER, "Break was signalled but ignored because the state is covered.");
           continue;
 
         } else {
           stats.countBreak++;
+          stats2.track("breaked");
           logger.log(Level.FINER, "Break signalled, CPAAlgorithm will stop.");
 
           // add the new state
@@ -411,6 +460,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       // merge operator won't do anything (i.e., it is merge-sep).
       if (mergeOperator != MergeSepOperator.getInstance() && !reached.isEmpty()) {
         stats.mergeTimer.start();
+        StatEvent mergeTimer = stats2.open("Merge");
         try {
           List<AbstractState> toRemove = new ArrayList<>();
           List<Pair<AbstractState, Precision>> toAdd = new ArrayList<>();
@@ -421,6 +471,8 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
               shutdownNotifier.shutdownIfNecessary();
               AbstractState mergedState =
                   mergeOperator.merge(successor, reachedState, successorPrecision);
+
+              mergeTimer.setValue(!mergedState.equals(reachedState) ? "merged" : "notmerged");
 
               if (!mergedState.equals(reachedState)) {
                 logger.log(Level.FINER, "Successor was merged with state from reached set");
@@ -444,27 +496,33 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
           }
 
         } finally {
+          stats2.close(mergeTimer);
           stats.mergeTimer.stop();
         }
       }
 
+      StatEvent stopTimer = stats2.open("Stop");
       stats.stopTimer.start();
       boolean stop;
       try {
         stop = stopOperator.stop(successor, reached, successorPrecision);
       } finally {
+        stats2.close(stopTimer);
         stats.stopTimer.stop();
       }
 
       if (stop) {
         logger.log(Level.FINER, "Successor is covered or unreachable, not adding to waitlist");
         stats.countStop++;
+        stats2.track("stopped");
 
       } else {
         logger.log(Level.FINER, "No need to stop, adding successor to waitlist");
 
         stats.addTimer.start();
+        StatEvent addTimer = stats2.open("Add");
         reachedSet.add(successor, successorPrecision);
+        stats2.close(addTimer);
         stats.addTimer.stop();
       }
     }
@@ -478,5 +536,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       ((StatisticsProvider)forcedCovering).collectStatistics(pStatsCollection);
     }
     pStatsCollection.add(stats);
+    pStatsCollection.add(stats2);
+    stats2.collectStatistics(pStatsCollection);
   }
 }
