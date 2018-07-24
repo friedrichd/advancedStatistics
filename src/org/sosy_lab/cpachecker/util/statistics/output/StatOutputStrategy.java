@@ -129,6 +129,7 @@ public class StatOutputStrategy {
    * @param mapping A mapping of variables and replacement objects
    */
   public String replaceVariables(Map<String, Object> mapping) {
+    // Prepair mapping
     Map<String, Object> map = new HashMap<>();
     for (Entry<String, Object> entry : mapping.entrySet()) {
       Object obj = entry.getValue();
@@ -145,16 +146,45 @@ public class StatOutputStrategy {
         map.put(entry.getKey(), obj);
       }
     }
-    Matcher m = Pattern.compile("\\$([A-Za-z0-9_\\.]+)\\$").matcher(getTemplate());
-    StringBuffer sb = new StringBuffer();
-    while (m.find()) {
-      Object obj = map.get(StatisticsUtils.escape(m.group(1)));
+    // Evaluate all if-elements
+    String template = getTemplate();
+    boolean ifs_found = true;
+    while (ifs_found) {
+      ifs_found = false;
+      Matcher ifs_m =
+          Pattern
+              .compile(
+                  "<if(\\s+((?!(<|>))[\\S\\s])*)?>(((?!<\\/?(if|for).*>)[\\S\\s])*)<\\/if(\\s+((?!(<|>))[\\S\\s])*)?>")
+              .matcher(template);
+      StringBuffer ifs_sb = new StringBuffer();
+      while (ifs_m.find()) {
+        ifs_found = true;
+        String target = ifs_m.group(1);
+        int from = target.indexOf("target=\"$");
+        int to = target.indexOf("$\"", from + 9);
+        Object obj = map.get(StatisticsUtils.escape(target.substring(from, to)));
+        // replace if-segement
+        if (obj != null) {
+          ifs_m.appendReplacement(ifs_sb, ifs_m.group(4));
+        } else {
+          ifs_m.appendReplacement(ifs_sb, "");
+        }
+      }
+      ifs_m.appendTail(ifs_sb);
+      template = ifs_sb.toString();
+    }
+
+    // Replace variables
+    Matcher vars_m = Pattern.compile("\\$([A-Za-z0-9_\\.]+)\\$").matcher(template);
+    StringBuffer vars_sb = new StringBuffer();
+    while (vars_m.find()) {
+      Object obj = map.get(StatisticsUtils.escape(vars_m.group(1)));
       if (obj != null) {
-        m.appendReplacement(sb, obj.toString().trim());
+        vars_m.appendReplacement(vars_sb, obj.toString().trim());
       }
     }
-    m.appendTail(sb);
-    return sb.toString();
+    vars_m.appendTail(vars_sb);
+    return vars_sb.toString();
   }
 
   private Supplier<String> getSupplierFromFile(File f) {
