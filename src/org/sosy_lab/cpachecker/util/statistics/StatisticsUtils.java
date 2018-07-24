@@ -26,6 +26,8 @@ package org.sosy_lab.cpachecker.util.statistics;
 import com.google.common.base.Strings;
 import java.io.PrintStream;
 import java.util.logging.Level;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
 import org.sosy_lab.common.log.LogManager;
 import org.sosy_lab.common.time.TimeSpan;
 import org.sosy_lab.common.time.Timer;
@@ -74,14 +76,29 @@ public class StatisticsUtils {
   }
 
   public static void write(StringBuilder sb, String name, Object value) {
-    sb.append(String.format("%-50s %s", name + ":", value)).append(System.lineSeparator());
+    write(sb, 0, 50, name, value);
+  }
+
+  public static void write(StringBuilder sb, int level, int colWidth, String name, Object value) {
+    String indentation = Strings.repeat("  ", level);
+    sb.append(String.format("%-" + colWidth + "s %s", indentation + name + ":", value))
+        .append(System.lineSeparator());
+  }
+
+  public static void writeIfExists(StringBuilder sb, String name, Object value) {
+    writeIfExists(sb, 0, 50, name, value);
   }
 
   public static void
-      write(StringBuilder sb, int indentLevel, int outputNameColWidth, String name, Object value) {
-    String indentation = Strings.repeat("  ", indentLevel);
-    sb.append(String.format("%-" + outputNameColWidth + "s %s", indentation + name + ":", value))
-        .append(System.lineSeparator());
+      writeIfExists(StringBuilder sb, int level, int colWidth, String name, Object value) {
+    Matcher m = Pattern.compile("\\$([A-Za-z0-9_\\.]+)\\$").matcher(value.toString());
+    if (m.find()) {
+      sb.append("<if target=\"" + m.group(0) + "\">");
+      write(sb, level, colWidth, name, value);
+      sb.append("</if>");
+    } else {
+      write(sb, level, colWidth, name, value);
+    }
   }
 
   /**
