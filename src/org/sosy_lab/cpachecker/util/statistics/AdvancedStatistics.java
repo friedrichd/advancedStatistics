@@ -111,35 +111,33 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
     return this;
   }
 
-  /**
-   * Starts the overall timer and enables the tracking of events.</br>
-   * <b>Notice:</b> Tracking can not be paused or restarted again!
-   */
+  /** Starts the overall timer and enables the tracking of events. */
   public synchronized void startTracking() {
-    if (!baseTime.isRunning() && baseTime.elapsed().isZero()) {
-      Set<String> variables = new HashSet<>();
-      for (StatOutputStrategy out : printStrategy) {
-        variables.addAll(out.getRequiredVariables());
+    if (!baseTime.isRunning()) {
+      if (baseTime.elapsed().isZero()) {
+        Set<String> variables = new HashSet<>();
+        for (StatOutputStrategy out : printStrategy) {
+          variables.addAll(out.getRequiredVariables());
+        }
+        baseStorage.createVariables(variables);
+      } else {
+        baseTime.reset();
       }
-      baseStorage.createVariables(variables);
       baseTime.start();
     }
   }
 
-  /**
-   * Disables the tracking of events and stops the overall timer.</br>
-   * <b>Notice:</b> Tracking can not be paused or restarted again!
-   */
+  /** Disables the tracking of events and stops the overall timer. */
   public synchronized void stopTracking() {
     if (baseTime.isRunning()) {
+      baseTime.stop();
+      baseStorage.update(baseTime.elapsed());
+
       // count all unclosed events as errors
       for (Deque<StatEvent> unclosedEvents : openEvents.values()) {
         errors.add(unclosedEvents.size());
       }
       openEvents.clear();
-
-      baseStorage.update(baseTime.elapsed());
-      baseTime.stop();
     }
   }
 
@@ -356,6 +354,7 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
      * @param value An additional value
      */
     public synchronized StatEvent setValue(Object value) {
+      assert !stored : "This event has already been stored!";
       this.value = value;
       return this;
     }
