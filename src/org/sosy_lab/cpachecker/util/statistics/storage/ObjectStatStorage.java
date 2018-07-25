@@ -79,15 +79,10 @@ public class ObjectStatStorage implements StatStorageStrategy {
   public Object get(String method) {
     if (method == null || method.isEmpty() || method.equals(".")) {
       return this;
-    } else if (method.equals("count")) {
-      return hist.size();
-    } else if (method.equals("hist")) {
-      return hist;
-    } else if (method.equals("distinct")) {
-      return hist.elementSet().size();
     } else if (method.contains("_")) {
       String value = method.substring(0, method.lastIndexOf("_"));
       String type = method.substring(method.lastIndexOf("_") + 1);
+      // Trying to find object/type in hist
       for (Object obj : hist.elementSet()) {
         if (value.equals(StatisticsUtils.escape(obj.toString()))) {
           switch (type) {
@@ -100,6 +95,7 @@ public class ObjectStatStorage implements StatStorageStrategy {
           }
         }
       }
+      // If nothing was found, return default/null values
       switch (type) {
         case "count":
           return 0;
@@ -107,6 +103,15 @@ public class ObjectStatStorage implements StatStorageStrategy {
           return StatisticsUtils.toPercent(0, 1);
         case "both":
           return StatisticsUtils.valueWithPercentage(0, 1);
+      }
+    }else{
+      switch (method) {
+        case "count":
+          return hist.size();
+        case "hist":
+          return hist;
+        case "distinct":
+          return hist.elementSet().size();
       }
     }
     return null;

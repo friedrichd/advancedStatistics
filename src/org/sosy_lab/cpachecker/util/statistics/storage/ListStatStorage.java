@@ -53,12 +53,15 @@ public class ListStatStorage implements StatStorageStrategy {
   public Object get(String method) {
     if (method == null || method.isEmpty() || method.equals(".")) {
       return this;
-    } else if (method.equals("list")) {
-      return Collections.unmodifiableList(list);
-    } else if (method.equals("count")) {
-      return list.size();
     } else {
-      return null;
+      switch (method) {
+        case "list":
+          return Collections.unmodifiableList(list);
+        case "count":
+          return list.size();
+        default:
+          return null;
+      }
     }
   }
 
