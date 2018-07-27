@@ -68,7 +68,6 @@ public class AdvancedStatisticsTest {
     String out = sb.toString();
     assertFalse("PrintStream is empty!", out.isEmpty());
     assertContains("Total time for foo", null, out);
-    assertNotContains("Defect StatEvents", out);
   }
 
   @Test
@@ -88,7 +87,6 @@ public class AdvancedStatisticsTest {
     assertFalse("PrintStream is empty!", out.isEmpty());
     assertContains("Total time for foo", null, out);
     assertContains("Test", "[A x 5, B x 4]", out);
-    assertNotContains("Defect StatEvents", out);
   }
 
   @Test
@@ -115,7 +113,6 @@ public class AdvancedStatisticsTest {
     assertContains("Counter for Test", "9", out);
     assertContains("AVG for Test", null, out);
     assertContains("SUM for Test", null, out);
-    assertNotContains("Defect StatEvents", out);
   }
 
   @Test
@@ -146,7 +143,6 @@ public class AdvancedStatisticsTest {
     assertFalse("PrintStream is empty!", out.isEmpty());
     assertContains("Total time for foo", null, out);
     assertContains("Counter for Test", "29", out);
-    assertNotContains("Defect StatEvents", out);
   }
 
   private void assertContains(String label, String value, String haystack) {
@@ -163,12 +159,6 @@ public class AdvancedStatisticsTest {
           "\"" + label + "\" is " + v + ", but should be " + value + "! " + haystack,
           value.equals(v));
     }
-  }
-
-  private void assertNotContains(String label, String haystack) {
-    assertFalse(
-        "PrintStream contains \"" + label + "\"! " + haystack,
-        haystack.toLowerCase().replaceAll("\\s+", " ").contains(label.toLowerCase()));
   }
 
   class TestWorker implements Runnable {
