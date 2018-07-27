@@ -22,6 +22,7 @@ package org.sosy_lab.cpachecker.util.statistics;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
+import java.time.Duration;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
@@ -51,7 +52,7 @@ public class AdvancedStatisticsTest {
 
   @Test(expected = AssertionError.class)
   public void closeWithoutStart() {
-    as.close("Test", false);
+    as.close(new StatEvent("Test", Duration.ofMillis(20), null), false);
   }
 
   @Test

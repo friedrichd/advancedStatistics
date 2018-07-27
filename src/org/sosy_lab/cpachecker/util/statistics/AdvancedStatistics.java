@@ -202,12 +202,10 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    *
    * @param label The name of the event
    */
-  public void close(String label) {
-    StatEvent stored_event = pop(e -> e.label.equals(label));
-    if (stored_event != null) {
-      stored_event.store(baseTime.elapsed());
-    }
-  }
+  /*
+   * public void close(String label) { StatEvent stored_event = pop(e -> e.label.equals(label)); if
+   * (stored_event != null) { stored_event.store(baseTime.elapsed()); } }
+   */
 
   /**
    * Closes the event.</br>
@@ -237,13 +235,11 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    * @param label The name of the event
    * @param value An additional value for categorization of the event
    */
-  public void close(String label, Object value) {
-    StatEvent stored_event = pop(e -> e.label.equals(label));
-    if (stored_event != null) {
-      stored_event.setValue(value);
-      stored_event.store(baseTime.elapsed());
-    }
-  }
+  /*
+   * public void close(String label, Object value) { StatEvent stored_event = pop(e ->
+   * e.label.equals(label)); if (stored_event != null) { stored_event.setValue(value);
+   * stored_event.store(baseTime.elapsed()); } }
+   */
 
   /**
    * Closes the event.</br>
