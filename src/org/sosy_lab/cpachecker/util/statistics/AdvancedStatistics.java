@@ -36,8 +36,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
-import java.util.concurrent.atomic.LongAdder;
 import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
@@ -61,9 +61,6 @@ import org.sosy_lab.cpachecker.util.statistics.storage.StatStorage;
  */
 public class AdvancedStatistics implements Statistics, StatisticsProvider {
 
-  private static final String ERROR_START_TRACKING =
-      "Please start tracking before trying to track something!";
-
   private final String name;
   private final Stopwatch baseTime = Stopwatch.createUnstarted();
 
@@ -72,11 +69,8 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
   // Variants for printing statistics
   private final List<StatOutputStrategy> printStrategy =
       Collections.synchronizedList(new ArrayList<>());
-
   // contains the stack of open events for all threads
   private final Map<Long, Deque<StatEvent>> openEvents = new HashMap<>();
-  // counter for detected errors
-  private final LongAdder errors = new LongAdder();
 
   public AdvancedStatistics(String name) {
     this.name = name;
@@ -134,8 +128,12 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
       baseStorage.update(baseTime.elapsed());
 
       // count all unclosed events as errors
-      for (Deque<StatEvent> unclosedEvents : openEvents.values()) {
-        errors.add(unclosedEvents.size());
+      for (Entry<Long, Deque<StatEvent>> unclosedEvents : openEvents.entrySet()) {
+        assert unclosedEvents.getValue().isEmpty() : "There are still "
+            + unclosedEvents.getValue().size()
+            + " open events on the stack for Thread #"
+            + unclosedEvents.getKey()
+            + "!";
       }
       openEvents.clear();
     }
@@ -182,7 +180,7 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
 
   /** Creates a new event for the given label. */
   private StatEvent createEvent(String label) {
-    assert baseTime.isRunning() : ERROR_START_TRACKING;
+    assert baseTime.isRunning() : "Please start tracking before trying to track something!";
     return new StatEvent(label, baseTime.elapsed(), getCurrentStorage().getSubStorage(label));
   }
 
@@ -205,7 +203,6 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    * @param label The name of the event
    */
   public void close(String label) {
-    assert baseTime.isRunning() : ERROR_START_TRACKING;
     StatEvent stored_event = pop(e -> e.label.equals(label));
     if (stored_event != null) {
       stored_event.store(baseTime.elapsed());
@@ -223,7 +220,6 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    * @param event The handle on the event
    */
   public void close(StatEvent event) {
-    assert baseTime.isRunning() : ERROR_START_TRACKING;
     StatEvent stored_event = pop(e -> e.equals(event));
     if (stored_event != null) {
       stored_event.store(baseTime.elapsed());
@@ -242,7 +238,6 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    * @param value An additional value for categorization of the event
    */
   public void close(String label, Object value) {
-    assert baseTime.isRunning() : ERROR_START_TRACKING;
     StatEvent stored_event = pop(e -> e.label.equals(label));
     if (stored_event != null) {
       stored_event.setValue(value);
@@ -262,7 +257,6 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    * @param value An additional value for categorization of the event
    */
   public void close(StatEvent event, Object value) {
-    assert baseTime.isRunning() : ERROR_START_TRACKING;
     StatEvent stored_event = pop(e -> e.equals(event));
     if (stored_event != null) {
       stored_event.setValue(value);
@@ -281,22 +275,14 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
 
   private synchronized StatEvent pop(Predicate<StatEvent> pred) {
     long id = Thread.currentThread().getId();
-    if (openEvents.containsKey(id)
-        && !openEvents.get(id).isEmpty()
-        && openEvents.get(id).stream().anyMatch(pred)) {
-      // Remove events until the right one is reached
-      while (!openEvents.get(id).isEmpty()) {
-        StatEvent e = openEvents.get(id).pop();
-        if (pred.test(e)) {
-          return e;
-        } else {
-          errors.increment();
-        }
-      }
-    } else {
-      errors.increment();
-    }
-    return null;
+    assert openEvents.containsKey(id)
+        && !openEvents.get(id).isEmpty() : "There are no open events for Thread #" + id + "!";
+    assert openEvents.get(id).stream().anyMatch(pred) : "There are is no open event for Thread #"
+        + id
+        + " that matches the predicate!";
+    StatEvent e = openEvents.get(id).pop();
+    assert pred.test(e) : "There last event for Thread #" + id + " doesn't match the predicate!";
+    return e;
   }
 
   private StatStorage getCurrentStorage() {
@@ -327,7 +313,6 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
         outStrategy.write(baseStorage.getVariableMap());
       }
     }
-    // TODO: ERRORHANDLING
   }
 
 
