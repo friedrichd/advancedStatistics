@@ -107,36 +107,33 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
 
   /** Starts the overall timer and enables the tracking of events. */
   public synchronized void startTracking() {
-    if (!baseTime.isRunning()) {
-      if (baseTime.elapsed().isZero()) {
-        Set<String> variables = new HashSet<>();
-        for (StatOutputStrategy out : printStrategy) {
-          variables.addAll(out.getRequiredVariables());
-        }
-        baseStorage.createVariables(variables);
-      } else {
-        baseTime.reset();
+    assert !baseTime.isRunning() : "Tracking is allready running!";
+    if (baseTime.elapsed().isZero()) {
+      Set<String> variables = new HashSet<>();
+      for (StatOutputStrategy out : printStrategy) {
+        variables.addAll(out.getRequiredVariables());
       }
-      baseTime.start();
+      baseStorage.createVariables(variables);
+    } else {
+      baseTime.reset();
     }
+    baseTime.start();
   }
 
   /** Disables the tracking of events and stops the overall timer. */
   public synchronized void stopTracking() {
-    if (baseTime.isRunning()) {
-      baseTime.stop();
-      baseStorage.update(baseTime.elapsed());
-
-      // count all unclosed events as errors
-      for (Entry<Long, Deque<StatEvent>> unclosedEvents : openEvents.entrySet()) {
-        assert unclosedEvents.getValue().isEmpty() : "There are still "
-            + unclosedEvents.getValue().size()
-            + " open events on the stack for Thread #"
-            + unclosedEvents.getKey()
-            + "!";
-      }
-      openEvents.clear();
+    assert baseTime.isRunning() : "Tracking is not running, so it can't be stopped!";
+    baseTime.stop();
+    baseStorage.update(baseTime.elapsed());
+    // count all unclosed events as errors
+    for (Entry<Long, Deque<StatEvent>> unclosedEvents : openEvents.entrySet()) {
+      assert unclosedEvents.getValue().isEmpty() : "There are still "
+          + unclosedEvents.getValue().size()
+          + " open events on the stack for Thread #"
+          + unclosedEvents.getKey()
+          + "!";
     }
+    openEvents.clear();
   }
 
   /**

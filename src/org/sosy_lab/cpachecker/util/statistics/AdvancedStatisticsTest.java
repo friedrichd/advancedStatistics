@@ -51,7 +51,19 @@ public class AdvancedStatisticsTest {
   }
 
   @Test(expected = AssertionError.class)
-  public void closeWithoutStart() {
+  public void stopTrackingWithoutStart() {
+    as.stopTracking();
+  }
+
+  @Test(expected = AssertionError.class)
+  public void stopTrackingWithoutClose() {
+    as.startTracking();
+    as.open("Test");
+    as.stopTracking();
+  }
+
+  @Test(expected = AssertionError.class)
+  public void closeWithoutOpen() {
     as.close(new StatEvent("Test", Duration.ofMillis(20), null), false);
   }
 
