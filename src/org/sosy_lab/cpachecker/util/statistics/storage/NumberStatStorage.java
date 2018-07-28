@@ -39,6 +39,7 @@ public class NumberStatStorage implements StatStorageStrategy {
     methods.add("max");
     methods.add("avg");
     methods.add("mean");
+    methods.add("var");
     methods.add("std");
   }
 
@@ -81,6 +82,11 @@ public class NumberStatStorage implements StatStorageStrategy {
       case "avg":
       case "mean":
         return count.intValue() > 0 ? sum.doubleValue() / count.doubleValue() : Double.NaN;
+      case "var":
+        return count.intValue() > 0
+            ? (sum_squared.doubleValue() - Math.pow(sum.doubleValue(), 2) / count.doubleValue())
+                / count.doubleValue()
+            : Double.NaN;
       case "std":
         return count.intValue() > 0
             ? Math.sqrt(
