@@ -288,6 +288,9 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
 
   @Override
   public void collectStatistics(Collection<Statistics> pStatsCollection) {
+    if (!pStatsCollection.contains(this)) {
+      pStatsCollection.add(this);
+    }
     for (StatOutputStrategy outStrategy : printStrategy) {
       if (outStrategy instanceof Statistics) {
         pStatsCollection.add((Statistics) outStrategy);

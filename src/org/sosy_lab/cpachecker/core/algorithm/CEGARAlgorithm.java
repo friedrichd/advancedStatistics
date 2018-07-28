@@ -365,7 +365,6 @@ public class CEGARAlgorithm implements Algorithm, StatisticsProvider, ReachedSet
       ((StatisticsProvider)mRefiner).collectStatistics(pStatsCollection);
     }
     pStatsCollection.add(stats);
-    pStatsCollection.add(stats2);
     stats2.collectStatistics(pStatsCollection);
   }
 

@@ -536,7 +536,6 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       ((StatisticsProvider)forcedCovering).collectStatistics(pStatsCollection);
     }
     pStatsCollection.add(stats);
-    pStatsCollection.add(stats2);
     stats2.collectStatistics(pStatsCollection);
   }
 }
