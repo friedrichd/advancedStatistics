@@ -24,7 +24,9 @@
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
 import com.google.common.collect.ConcurrentHashMultiset;
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Multiset;
+import java.util.Collections;
 import java.util.HashSet;
 import java.util.Set;
 import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
@@ -39,40 +41,46 @@ import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
  */
 public class ObjectStatStorage implements StatStorageStrategy {
 
-  private final Set<String> methods = new HashSet<>();
-  {
-    methods.add("count");
-    methods.add("distinct");
-    methods.add("hist");
-  }
+  private static final Set<String> default_methods = ImmutableSet.of("count", "distinct", "hist");
+
+  private final Set<String> methods = new HashSet<>(default_methods);
   private final Multiset<Object> hist = ConcurrentHashMultiset.create();
 
   @Override
   public void update(Object value) {
     if (value != null) {
       hist.add(value);
-      methods.add(StatisticsUtils.escape(value.toString()));
+      updateMethods(value.toString());
     }
   }
 
   @Override
   public Set<String> getMethods() {
-    return methods;
+    return Collections.unmodifiableSet(methods);
+  }
+
+  private void updateMethods(String method) {
+    if (method != null && !method.isEmpty() && !method.equals(".")) {
+      method = StatisticsUtils.escape(method.substring(method.lastIndexOf(".") + 1));
+      if (method.endsWith("_count") || method.endsWith("_perc") || method.endsWith("_both")) {
+        method = method.substring(0, method.indexOf("_"));
+      }
+      methods.add(method + "_count");
+      methods.add(method + "_perc");
+      methods.add(method + "_both");
+    }
   }
 
   @Override
   public boolean isValidPath(String path) {
-    boolean result =
-        path == null
-            || !path.contains(".")
-            || path.equals(".")
-            || path.endsWith("_count")
-            || path.endsWith("_perc")
-            || path.endsWith("_both");
-    if (result) {
-      methods.add(StatisticsUtils.escape(path));
+    boolean existsInMethods = StatStorageStrategy.super.isValidPath(path);
+    if (!existsInMethods
+        && !path.contains(".")
+        && (path.endsWith("_count") || path.endsWith("_perc") || path.endsWith("_both"))) {
+      updateMethods(path);
+      return true;
     }
-    return result;
+    return existsInMethods;
   }
 
   @Override
