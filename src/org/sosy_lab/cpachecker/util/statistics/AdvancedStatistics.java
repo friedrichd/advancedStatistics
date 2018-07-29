@@ -43,7 +43,7 @@ import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.interfaces.Statistics;
 import org.sosy_lab.cpachecker.core.interfaces.StatisticsProvider;
 import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
-import org.sosy_lab.cpachecker.util.statistics.output.BasicStatOutputStrategy;
+import org.sosy_lab.cpachecker.util.statistics.output.BasicStatOutput;
 import org.sosy_lab.cpachecker.util.statistics.output.StatOutputStrategy;
 import org.sosy_lab.cpachecker.util.statistics.storage.StatStorage;
 
@@ -92,7 +92,7 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
   public AdvancedStatistics addBasicTemplate(Supplier<String> loadTemplate) {
     assert !baseTime.isRunning()
         && baseTime.elapsed().isZero() : "Outputs have to be added before tracking is started!";
-    printStrategy.add(new BasicStatOutputStrategy(name, baseStorage, loadTemplate));
+    printStrategy.add(new BasicStatOutput(name, baseStorage, loadTemplate));
     return this;
   }
 
@@ -100,7 +100,7 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
   public AdvancedStatistics addBasicTemplate(File templateFile) {
     assert !baseTime.isRunning()
         && baseTime.elapsed().isZero() : "Outputs have to be added before tracking is started!";
-    printStrategy.add(new BasicStatOutputStrategy(name, baseStorage, templateFile));
+    printStrategy.add(new BasicStatOutput(name, baseStorage, templateFile));
     return this;
   }
 
@@ -263,9 +263,13 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
   }
 
   public void printStatistics() {
+    Map<String, Object> mapping = null;
     for (StatOutputStrategy outStrategy : printStrategy) {
       if (!(outStrategy instanceof Statistics)) {
-        outStrategy.write(baseStorage.getVariableMap());
+        if (mapping == null) {
+          mapping = baseStorage.getVariableMap();
+        }
+        outStrategy.write(mapping);
       }
     }
   }

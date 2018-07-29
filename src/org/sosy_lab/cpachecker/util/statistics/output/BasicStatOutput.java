@@ -31,18 +31,18 @@ import org.sosy_lab.cpachecker.util.statistics.storage.StatStorage;
  * Implements {@link Statistics} and therefore can be used to print statistics in the default
  * statistics file.
  */
-public class BasicStatOutputStrategy extends StatOutputStrategy implements Statistics {
+public class BasicStatOutput extends StatOutput implements Statistics {
 
   private final String name;
   private final StatStorage storage;
 
-  public BasicStatOutputStrategy(String name, StatStorage baseStorage, Supplier<String> loadTemplate) {
+  public BasicStatOutput(String name, StatStorage baseStorage, Supplier<String> loadTemplate) {
     super(loadTemplate);
     this.name = name;
     this.storage = baseStorage;
   }
 
-  public BasicStatOutputStrategy(String name, StatStorage baseStorage, File templateFile) {
+  public BasicStatOutput(String name, StatStorage baseStorage, File templateFile) {
     super(templateFile);
     this.name = name;
     this.storage = baseStorage;

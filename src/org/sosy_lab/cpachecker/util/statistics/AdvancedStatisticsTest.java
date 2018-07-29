@@ -29,7 +29,7 @@ import java.util.concurrent.TimeUnit;
 import org.junit.Before;
 import org.junit.Test;
 import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics.StatEvent;
-import org.sosy_lab.cpachecker.util.statistics.output.StatOutputStrategy;
+import org.sosy_lab.cpachecker.util.statistics.output.StatOutput;
 
 public class AdvancedStatisticsTest {
 
@@ -71,7 +71,7 @@ public class AdvancedStatisticsTest {
   public void startstop() throws InterruptedException {
     StringBuilder sb = new StringBuilder();
     as.addOutputStrategy(
-        new StatOutputStrategy(() -> "Total time for foo: $time.sum$\n")
+        new StatOutput(() -> "Total time for foo: $time.sum$\n")
             .addOutputWriter(s -> sb.append(s)));
     as.startTracking();
     Thread.sleep(10);
@@ -87,7 +87,7 @@ public class AdvancedStatisticsTest {
   public void track() {
     StringBuilder sb = new StringBuilder();
     as.addOutputStrategy(
-        new StatOutputStrategy(() -> "Total time for foo: $time.sum$\nTest: $test.value.hist$\n")
+        new StatOutput(() -> "Total time for foo: $time.sum$\nTest: $test.value.hist$\n")
             .addOutputWriter(s -> sb.append(s)));
     as.startTracking();
     for (int i = 0; i < 9; i++) {
@@ -106,7 +106,7 @@ public class AdvancedStatisticsTest {
   public void openclose() throws InterruptedException {
     StringBuilder sb = new StringBuilder();
     as.addOutputStrategy(
-        new StatOutputStrategy(
+        new StatOutput(
             () -> "Total time for foo: $time.sum$\n"
                 + "Counter for Test: $test.count$\n"
                 + "AVG for Test: $test.time.avg$\n"
@@ -132,7 +132,7 @@ public class AdvancedStatisticsTest {
   public void openclose_multiple() throws InterruptedException {
     StringBuilder sb = new StringBuilder();
     as.addOutputStrategy(
-        new StatOutputStrategy(
+        new StatOutput(
             () -> "Total time for foo: $time.sum$\n"
                 + "Counter for Test: $test.count$\n").addOutputWriter(s -> sb.append(s)));
     as.startTracking();
