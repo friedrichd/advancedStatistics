@@ -77,6 +77,8 @@ public class ObjectStatStorage implements StatStorageStrategy {
     if (!existsInMethods
         && !path.contains(".")
         && (path.endsWith("_count") || path.endsWith("_perc") || path.endsWith("_both"))) {
+      // Adding this path to methods is required as all options in methods are included in the
+      // variable map. Therefore variables that do not occur in hist can be replaced in output.
       updateMethods(path);
       return true;
     }
