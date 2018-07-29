@@ -64,7 +64,7 @@ public class AdvancedStatisticsTest {
 
   @Test(expected = AssertionError.class)
   public void closeWithoutOpen() {
-    as.close(new StatEvent("Test", Duration.ofMillis(20), null), false);
+    as.close(new StatEvent(Duration.ofMillis(20), null), false);
   }
 
   @Test

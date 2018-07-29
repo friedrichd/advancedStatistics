@@ -38,7 +38,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
-import java.util.function.Predicate;
 import java.util.function.Supplier;
 import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.interfaces.Statistics;
@@ -178,31 +177,8 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
   /** Creates a new event for the given label. */
   private StatEvent createEvent(String label) {
     assert baseTime.isRunning() : "Please start tracking before trying to track something!";
-    return new StatEvent(label, baseTime.elapsed(), getCurrentStorage().getSubStorage(label));
+    return new StatEvent(baseTime.elapsed(), getCurrentStorage().getSubStorage(label));
   }
-
-  /** Validates if an event is open on the current thread for given label. */
-  public boolean hasOpenEvent(String label) {
-    long id = Thread.currentThread().getId();
-    return openEvents.containsKey(id)
-        && !openEvents.get(id).isEmpty()
-        && openEvents.get(id).stream().anyMatch(a -> a.label.equals(label));
-  }
-
-  /**
-   * Closes the last open event with the same label.</br>
-   * <b>Notice:</b> Some behavior is not considered reasonable and will increment the error count:
-   * <ul>
-   * <li>Closing an event, that has not been opened or was already closed</li>
-   * <li>Not closing another event, that has been opened after opening this event</li>
-   * </ul>
-   *
-   * @param label The name of the event
-   */
-  /*
-   * public void close(String label) { StatEvent stored_event = pop(e -> e.label.equals(label)); if
-   * (stored_event != null) { stored_event.store(baseTime.elapsed()); } }
-   */
 
   /**
    * Closes the event.</br>
@@ -215,28 +191,11 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    * @param event The handle on the event
    */
   public void close(StatEvent event) {
-    StatEvent stored_event = pop(e -> e.equals(event));
+    StatEvent stored_event = pop(event);
     if (stored_event != null) {
       stored_event.store(baseTime.elapsed());
     }
   }
-
-  /**
-   * Closes the last open event with the same label.</br>
-   * <b>Notice:</b> Some behavior is not considered reasonable and will increment the error count:
-   * <ul>
-   * <li>Closing an event, that has not been opened or was already closed</li>
-   * <li>Not closing another event, that has been opened after opening this event</li>
-   * </ul>
-   *
-   * @param label The name of the event
-   * @param value An additional value for categorization of the event
-   */
-  /*
-   * public void close(String label, Object value) { StatEvent stored_event = pop(e ->
-   * e.label.equals(label)); if (stored_event != null) { stored_event.setValue(value);
-   * stored_event.store(baseTime.elapsed()); } }
-   */
 
   /**
    * Closes the event.</br>
@@ -250,7 +209,7 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    * @param value An additional value for categorization of the event
    */
   public void close(StatEvent event, Object value) {
-    StatEvent stored_event = pop(e -> e.equals(event));
+    StatEvent stored_event = pop(event);
     if (stored_event != null) {
       stored_event.setValue(value);
       stored_event.store(baseTime.elapsed());
@@ -266,15 +225,15 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
     return event;
   }
 
-  private synchronized StatEvent pop(Predicate<StatEvent> pred) {
+  private synchronized StatEvent pop(StatEvent event) {
     long id = Thread.currentThread().getId();
     assert openEvents.containsKey(id)
         && !openEvents.get(id).isEmpty() : "There are no open events for Thread #" + id + "!";
-    assert openEvents.get(id).stream().anyMatch(pred) : "There are is no open event for Thread #"
+    assert openEvents.get(id).contains(event) : "There are is no open event for Thread #"
         + id
         + " that matches the predicate!";
     StatEvent e = openEvents.get(id).pop();
-    assert pred.test(e) : "There last event for Thread #" + id + " doesn't match the predicate!";
+    assert e.equals(event) : "There last event for Thread #" + id + " doesn't match the predicate!";
     return e;
   }
 
@@ -317,14 +276,12 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    */
   public static class StatEvent {
 
-    private final String label;
     private final StatStorage storage;
     private final Duration start_time;
     private Object value = null;
     private boolean stored = false;
 
-    public StatEvent(String label, Duration start_time, StatStorage storage) {
-      this.label = label;
+    public StatEvent(Duration start_time, StatStorage storage) {
       this.start_time = start_time;
       this.storage = storage;
     }
