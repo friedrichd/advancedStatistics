@@ -23,12 +23,12 @@
  */
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
+import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.InvocationTargetException;
 import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -44,16 +44,10 @@ import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
  */
 public class StatStorage implements StatStorageStrategy {
 
-  static final Set<String> methods = new HashSet<>();
-  static final List<Class<? extends StatStorageStrategy>> VALUETYPES = new ArrayList<>();
-  static {
-    methods.add("count");
-    methods.add("value");
-    methods.add("time");
-    VALUETYPES.add(NumberStatStorage.class);
-    VALUETYPES.add(ObjectStatStorage.class);
-    VALUETYPES.add(ListStatStorage.class);
-  }
+  private static final Set<String> methods = ImmutableSet.of("count", "value", "time");
+  private static final Set<Class<? extends StatStorageStrategy>> VALUETYPES =
+      ImmutableSet.of(NumberStatStorage.class, ObjectStatStorage.class, ListStatStorage.class);
+
 
   // labeled, ordered list of all sub-storages
   private final Map<String, StatStorage> children =

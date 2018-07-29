@@ -19,7 +19,7 @@
  */
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
-import java.util.HashSet;
+import com.google.common.collect.ImmutableSet;
 import java.util.Set;
 import java.util.concurrent.atomic.DoubleAccumulator;
 import java.util.concurrent.atomic.DoubleAdder;
@@ -31,17 +31,8 @@ import java.util.concurrent.atomic.LongAdder;
  */
 public class NumberStatStorage implements StatStorageStrategy {
 
-  private static final Set<String> methods = new HashSet<>();
-  static {
-    methods.add("count");
-    methods.add("sum");
-    methods.add("min");
-    methods.add("max");
-    methods.add("avg");
-    methods.add("mean");
-    methods.add("var");
-    methods.add("std");
-  }
+  private static final Set<String> methods =
+      ImmutableSet.of("count", "sum", "min", "max", "avg", "mean", "var", "std");
 
   private LongAdder count = new LongAdder();
   private DoubleAdder sum = new DoubleAdder(), sum_squared = new DoubleAdder();

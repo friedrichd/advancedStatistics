@@ -19,9 +19,9 @@
  */
 package org.sosy_lab.cpachecker.util.statistics.storage;
 
+import com.google.common.collect.ImmutableSet;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
@@ -31,12 +31,7 @@ import java.util.Set;
  */
 public class ListStatStorage implements StatStorageStrategy {
 
-  private static final Set<String> methods = new HashSet<>();
-  static {
-    methods.add("list");
-    methods.add("count");
-  }
-
+  private static final Set<String> methods = ImmutableSet.of("list", "count");
   private List<Object> list = Collections.synchronizedList(new ArrayList<>());
 
   @Override
