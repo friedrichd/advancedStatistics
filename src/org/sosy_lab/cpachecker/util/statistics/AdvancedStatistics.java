@@ -123,7 +123,7 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
   public synchronized void stopTracking() {
     assert baseTime.isRunning() : "Tracking is not running, so it can't be stopped!";
     baseTime.stop();
-    baseStorage.update(baseTime.elapsed());
+    baseStorage.update(Collections.singletonMap("duration", baseTime.elapsed()));
     // count all unclosed events as errors
     for (Entry<Long, Deque<StatEvent>> unclosedEvents : openEvents.entrySet()) {
       assert unclosedEvents.getValue().isEmpty() : "There are still "
@@ -141,7 +141,7 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    * @param label representing the name of the event
    */
   public StatEvent track(String label) {
-    return createEvent(label).store();
+    return createEvent(label).store(null);
   }
 
   /**
@@ -151,7 +151,7 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
    * @param value An additional value for categorization of the event
    */
   public StatEvent track(String label, Object value) {
-    return createEvent(label).setValue(value).store();
+    return createEvent(label).setValue(value).store(null);
   }
 
   /**
@@ -302,37 +302,25 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
     }
 
     /**
-     * Stores the event without termination time (therefore without duration).
-     */
-    private synchronized StatEvent store() {
-      assert !stored : "This event has already been stored!";
-      if (value == null) {
-        storage.update();
-      } else {
-        storage.update(value);
-      }
-      stored = true;
-      return this;
-    }
-
-    /**
      * Stores the event.
      *
-     * @param end_time The time when the event was terminated.
+     * @param end_time The time when the event was terminated, or null
      */
     private synchronized StatEvent store(Duration end_time) {
       assert !stored : "This event has already been stored!";
-      if (end_time == null || start_time.compareTo(end_time) > 0) {
-        store();
-      } else if(value == null){
-        storage.update(end_time.minus(start_time));
-      } else {
-        storage.update(end_time.minus(start_time), value);
+      Map<String, Object> map = new HashMap<>();
+      map.put("start_time", start_time);
+      if (value != null) {
+        map.put("value", value);
       }
+      if (end_time != null && start_time.compareTo(end_time) <= 0) {
+        map.put("end_time", end_time);
+        map.put("duration", end_time.minus(start_time));
+      }
+      storage.update(Collections.unmodifiableMap(map));
       stored = true;
       return this;
     }
-
   }
 
 }

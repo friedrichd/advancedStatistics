@@ -41,9 +41,6 @@ public interface StatStorageStrategy {
   /** Returns the inner or terminal node identified by this path. */
   public Object get(String path);
 
-  /** Updates a node with no value. */
-  public default void update() {}
-
   /** Updates a node with an object value. */
   public void update(Object obj);
 

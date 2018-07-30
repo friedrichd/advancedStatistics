@@ -25,7 +25,6 @@ package org.sosy_lab.cpachecker.util.statistics.storage;
 
 import com.google.common.collect.ImmutableSet;
 import java.lang.reflect.InvocationTargetException;
-import java.time.Duration;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Collections;
@@ -119,46 +118,29 @@ public class StatStorage implements StatStorageStrategy {
     }
   }
 
-  /** Updates the storage with a new event without duration or additional value. */
-  @Override
-  public void update() {
-    countEvents.increment();
-  }
-
-  /**
-   * Updates the storage with a new event without additional value.
-   *
-   * @param duration The duration of the event
-   */
-  public void update(Duration duration) {
-    update();
-    updateDuration(duration);
-  }
-
-  /**
-   * Updates the storage with a new event without duration.
-   *
-   * @param value An additional value of the event for categorization
-   */
-  @Override
-  public void update(Object value) {
-    update();
-    updateValue(value);
-  }
-
   /**
    * Updates the storage with a new event.
-   *
-   * @param duration The duration of the event
-   * @param value An additional value of the event for categorization
+   * 
+   * @param event The event as a Map&lt;String, Object&gt;
    */
-  public void update(Duration duration, Object value) {
-    update();
-    updateDuration(duration);
-    updateValue(value);
+  @Override
+  public void update(Object event) {
+    countEvents.increment();
+    if (event instanceof Map<?, ?>) {
+      for (Entry<?, ?> entry : ((Map<?, ?>) event).entrySet()) {
+        switch (entry.getKey().toString()) {
+          case "duration":
+            updateDuration(entry.getValue());
+            break;
+          case "value":
+            updateValue(entry.getValue());
+            break;
+        }
+      }
+    }
   }
 
-  private void updateDuration(Duration duration) {
+  private void updateDuration(Object duration) {
     if (storeDuration == null) {
       storeDuration = new DurationStatStorage();
     }
