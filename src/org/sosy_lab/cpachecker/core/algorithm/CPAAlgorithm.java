@@ -154,7 +154,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
         StatisticsUtils.write(sb, 1, 50, "Time for stop operator", "$stop.time$");
         StatisticsUtils.write(sb, 1, 50, "Time for adding to reached set", "$add.time$");
         return sb.toString();
-      });
+      }).addOutputStrategy(new JSONOutput("reachedset", "reachedset.json"));
 
   private final TransferRelation transferRelation;
   private final MergeOperator mergeOperator;
@@ -185,6 +185,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
   @Override
   public AlgorithmStatus run(final ReachedSet reachedSet) throws CPAException, InterruptedException {
     stats.startTracking();
+    stats.track("ReachedSet", reachedSet.size(), null);
     try {
       return run0(reachedSet);
     } finally {
