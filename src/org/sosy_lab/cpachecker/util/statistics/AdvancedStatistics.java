@@ -113,8 +113,6 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
         variables.addAll(out.getRequiredVariables());
       }
       baseStorage.createVariables(variables);
-    } else {
-      baseTime.reset();
     }
     baseTime.start();
   }
