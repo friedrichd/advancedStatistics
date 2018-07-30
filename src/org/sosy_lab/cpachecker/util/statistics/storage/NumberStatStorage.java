@@ -40,7 +40,7 @@ public class NumberStatStorage implements StatStorageStrategy {
   private DoubleAccumulator max = new DoubleAccumulator(Math::max, Double.NEGATIVE_INFINITY);
 
   @Override
-  public void update(Object obj) {
+  public synchronized void update(Object obj) {
     if (obj instanceof Number) {
       double d = ((Number) obj).doubleValue();
       count.increment();
