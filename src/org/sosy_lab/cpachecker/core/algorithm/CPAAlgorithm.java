@@ -24,7 +24,6 @@
 package org.sosy_lab.cpachecker.core.algorithm;
 
 import com.google.common.base.Functions;
-import java.io.PrintStream;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -33,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Optional;
-import java.util.concurrent.TimeUnit;
 import java.util.logging.Level;
 import javax.annotation.Nullable;
 import org.sosy_lab.common.ShutdownNotifier;
@@ -43,8 +41,6 @@ import org.sosy_lab.common.configuration.InvalidConfigurationException;
 import org.sosy_lab.common.configuration.Option;
 import org.sosy_lab.common.configuration.Options;
 import org.sosy_lab.common.log.LogManager;
-import org.sosy_lab.common.time.Timer;
-import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.defaults.MergeSepOperator;
 import org.sosy_lab.cpachecker.core.interfaces.AbstractState;
 import org.sosy_lab.cpachecker.core.interfaces.ConfigurableProgramAnalysis;
@@ -61,7 +57,6 @@ import org.sosy_lab.cpachecker.core.interfaces.TransferRelation;
 import org.sosy_lab.cpachecker.core.reachedset.PartitionedReachedSet;
 import org.sosy_lab.cpachecker.core.reachedset.PseudoPartitionedReachedSet;
 import org.sosy_lab.cpachecker.core.reachedset.ReachedSet;
-import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
 import org.sosy_lab.cpachecker.cpa.arg.ARGMergeJoinCPAEnabledAnalysis;
 import org.sosy_lab.cpachecker.exceptions.CPAException;
 import org.sosy_lab.cpachecker.util.AbstractStates;
@@ -72,73 +67,11 @@ import org.sosy_lab.cpachecker.util.statistics.AdvancedStatistics.StatEvent;
 import org.sosy_lab.cpachecker.util.statistics.StatCounter;
 import org.sosy_lab.cpachecker.util.statistics.StatInt;
 import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
-import org.sosy_lab.cpachecker.util.statistics.StatisticsWriter;
+import org.sosy_lab.cpachecker.util.statistics.output.JSONOutput;
 
 public class CPAAlgorithm implements Algorithm, StatisticsProvider {
 
-  private static class CPAStatistics implements Statistics {
-
-    private Timer totalTimer         = new Timer();
-    private Timer chooseTimer        = new Timer();
-    private Timer precisionTimer     = new Timer();
-    private Timer transferTimer      = new Timer();
-    private Timer mergeTimer         = new Timer();
-    private Timer stopTimer          = new Timer();
-    private Timer addTimer           = new Timer();
-    private Timer forcedCoveringTimer = new Timer();
-
-    private int   countIterations   = 0;
-    private int   maxWaitlistSize   = 0;
-    private long  countWaitlistSize = 0;
-    private int   countSuccessors   = 0;
-    private int   maxSuccessors     = 0;
-    private int   countMerge        = 0;
-    private int   countStop         = 0;
-    private int   countBreak        = 0;
-
-    private Map<String, AbstractStatValue> reachedSetStatistics = new HashMap<>();
-
-    @Override
-    public String getName() {
-      return "CPA algorithm";
-    }
-
-    @Override
-    public void printStatistics(PrintStream out, Result pResult, UnmodifiableReachedSet pReached) {
-      out.println("Number of iterations:            " + countIterations);
-      if (countIterations == 0) {
-        // Statistics not relevant, prevent division by zero
-        return;
-      }
-
-      out.println("Max size of waitlist:            " + maxWaitlistSize);
-      out.println("Average size of waitlist:        " + countWaitlistSize
-          / countIterations);
-      StatisticsWriter w = StatisticsWriter.writingStatisticsTo(out);
-      for (AbstractStatValue c : reachedSetStatistics.values()) {
-        w.put(c);
-      }
-      out.println("Number of computed successors:   " + countSuccessors);
-      out.println("Max successors for one state:    " + maxSuccessors);
-      out.println("Number of times merged:          " + countMerge);
-      out.println("Number of times stopped:         " + countStop);
-      out.println("Number of times breaked:         " + countBreak);
-      out.println();
-      out.println("Total time for CPA algorithm:     " + totalTimer + " (Max: " + totalTimer.getMaxTime().formatAs(TimeUnit.SECONDS) + ")");
-      out.println("  Time for choose from waitlist:  " + chooseTimer);
-      if (forcedCoveringTimer.getNumberOfIntervals() > 0) {
-        out.println("  Time for forced covering:       " + forcedCoveringTimer);
-      }
-      out.println("  Time for precision adjustment:  " + precisionTimer);
-      out.println("  Time for transfer relation:     " + transferTimer);
-      if (mergeTimer.getNumberOfIntervals() > 0) {
-        out.println("  Time for merge operator:        " + mergeTimer);
-      }
-      out.println("  Time for stop operator:         " + stopTimer);
-      out.println("  Time for adding to reached set: " + addTimer);
-
-    }
-  }
+  private Map<String, AbstractStatValue> reachedSetStatistics = new HashMap<>();
 
   @Options(prefix = "cpa")
   public static class CPAAlgorithmFactory implements AlgorithmFactory {
@@ -192,19 +125,18 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
 
   private final ForcedCovering forcedCovering;
 
-  private final CPAStatistics               stats = new CPAStatistics();
-  private final AdvancedStatistics stats2 =
+  private final AdvancedStatistics stats =
       new AdvancedStatistics("CPA algorithm").addBasicTemplate(() -> {
         StringBuilder sb = new StringBuilder();
         StatisticsUtils.write(sb, "Number of iterations", "$sizeofwaitlist.count$");
 
         StatisticsUtils.write(sb, "Max size of waitlist", "$sizeofwaitlist.value.max$");
         StatisticsUtils.write(sb, "Average size of waitlist", "$sizeofwaitlist.value.avg$");
-
-        /*StatisticsWriter w = StatisticsWriter.writingStatisticsTo(out);
         for (AbstractStatValue c : reachedSetStatistics.values()) {
-          w.put(c);
-        }*/
+          StatisticsUtils.write(sb, 1, 50, c.getTitle(), c);
+        }
+        sb.append(System.lineSeparator());
+
         StatisticsUtils.write(sb, "Number of computed successors", "$successors.value.sum$");
         StatisticsUtils.write(sb, "Max successors for one state", "$successors.value.max$");
         StatisticsUtils.write(sb, "Number of times merged", "$merge.value.merged_both$");
@@ -252,20 +184,11 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
 
   @Override
   public AlgorithmStatus run(final ReachedSet reachedSet) throws CPAException, InterruptedException {
-    stats.totalTimer.start();
-    stats2.startTracking();
+    stats.startTracking();
     try {
       return run0(reachedSet);
     } finally {
-      stats2.stopTracking();
-      stats.totalTimer.stopIfRunning();
-      stats.chooseTimer.stopIfRunning();
-      stats.precisionTimer.stopIfRunning();
-      stats.transferTimer.stopIfRunning();
-      stats.mergeTimer.stopIfRunning();
-      stats.stopTimer.stopIfRunning();
-      stats.addTimer.stopIfRunning();
-      stats.forcedCoveringTimer.stopIfRunning();
+      stats.stopTracking();
 
       Map<String, ? extends AbstractStatValue> reachedSetStats;
       if (reachedSet instanceof PartitionedReachedSet) {
@@ -280,10 +203,10 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
         for (Entry<String, ? extends AbstractStatValue> e : reachedSetStats.entrySet()) {
           String key = e.getKey();
           AbstractStatValue val = e.getValue();
-          if (!stats.reachedSetStatistics.containsKey(key)) {
-            stats.reachedSetStatistics.put(key, val);
+          if (!reachedSetStatistics.containsKey(key)) {
+            reachedSetStatistics.put(key, val);
           } else {
-            AbstractStatValue newVal = stats.reachedSetStatistics.get(key);
+            AbstractStatValue newVal = reachedSetStatistics.get(key);
 
             if (newVal instanceof StatCounter) {
               assert val instanceof StatCounter;
@@ -307,23 +230,14 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
     while (reachedSet.hasWaitingState()) {
       shutdownNotifier.shutdownIfNecessary();
 
-      stats.countIterations++;
-
       // Pick next state using strategy
       // BFS, DFS or top sort according to the configuration
-      int size = reachedSet.getWaitlist().size();
-      if (size >= stats.maxWaitlistSize) {
-        stats.maxWaitlistSize = size;
-      }
-      stats.countWaitlistSize += size;
-      stats2.track("SizeOfWaitlist", reachedSet.getWaitlist().size());
+      stats.track("SizeOfWaitlist", reachedSet.getWaitlist().size());
 
-      stats.chooseTimer.start();
-      StatEvent chooseTimer = stats2.open("Choose");
+      StatEvent chooseTimer = stats.open("Choose");
       final AbstractState state = reachedSet.popFromWaitlist();
       final Precision precision = reachedSet.getPrecision(state);
-      stats2.close(chooseTimer);
-      stats.chooseTimer.stop();
+      stats.close(chooseTimer);
 
       logger.log(Level.FINER, "Retrieved state from waitlist");
       try {
@@ -356,8 +270,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
     logger.log(Level.ALL, "Current state is", state, "with precision", precision);
 
     if (forcedCovering != null) {
-      stats.forcedCoveringTimer.start();
-      StatEvent forcedCoveringTimer = stats2.open("forcedCovering");
+      StatEvent forcedCoveringTimer = stats.open("forcedCovering");
       try {
         boolean stop = forcedCovering.tryForcedCovering(state, precision, reachedSet);
 
@@ -366,28 +279,23 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
           return false;
         }
       } finally {
-        stats2.close(forcedCoveringTimer);
-        stats.forcedCoveringTimer.stop();
+        stats.close(forcedCoveringTimer);
       }
     }
 
-    stats.transferTimer.start();
-    StatEvent transferTimer = stats2.open("Transfer");
+    StatEvent transferTimer = stats.open("Transfer");
     Collection<? extends AbstractState> successors;
     try {
       successors = transferRelation.getAbstractSuccessors(state, precision);
     } finally {
-      stats2.close(transferTimer);
-      stats.transferTimer.stop();
+      stats.close(transferTimer);
     }
     // TODO When we have a nice way to mark the analysis result as incomplete,
     // we could continue analysis on a CPATransferException with the next state from waitlist.
 
     int numSuccessors = successors.size();
     logger.log(Level.FINER, "Current state has", numSuccessors, "successors");
-    stats2.track("Successors", numSuccessors);
-    stats.countSuccessors += numSuccessors;
-    stats.maxSuccessors = Math.max(numSuccessors, stats.maxSuccessors);
+    stats.track("Successors", numSuccessors);
 
     for (Iterator<? extends AbstractState> it = successors.iterator(); it.hasNext();) {
       AbstractState successor = it.next();
@@ -395,8 +303,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       logger.log(Level.FINER, "Considering successor of current state");
       logger.log(Level.ALL, "Successor of", state, "\nis", successor);
 
-      stats.precisionTimer.start();
-      StatEvent precisionTimer = stats2.open("Precision");
+      StatEvent precisionTimer = stats.open("Precision");
       PrecisionAdjustmentResult precAdjustmentResult;
       try {
         Optional<PrecisionAdjustmentResult> precAdjustmentOptional =
@@ -407,8 +314,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
         }
         precAdjustmentResult = precAdjustmentOptional.get();
       } finally {
-        stats.precisionTimer.stop();
-        stats2.close(precisionTimer);
+        stats.close(precisionTimer);
       }
 
       successor = precAdjustmentResult.abstractState();
@@ -416,32 +322,29 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       Action action = precAdjustmentResult.action();
 
       if (action == Action.BREAK) {
-        StatEvent stopTimer = stats2.open("Stop");
-        stats.stopTimer.start();
+        StatEvent stopTimer = stats.open("Stop");
         boolean stop;
         try {
           stop = stopOperator.stop(successor, reachedSet.getReached(successor), successorPrecision);
         } finally {
-          stats.stopTimer.stop();
-          stats2.close(stopTimer);
+          stats.close(stopTimer);
         }
 
         if (AbstractStates.isTargetState(successor) && stop) {
           // don't signal BREAK for covered states
           // no need to call merge and stop either, so just ignore this state
           // and handle next successor
-          stats.countStop++;
-          stats2.track("stopped");
+          stats.track("Stopped");
           logger.log(Level.FINER, "Break was signalled but ignored because the state is covered.");
           continue;
 
         } else {
-          stats.countBreak++;
-          stats2.track("breaked");
+          stats.track("breaked");
           logger.log(Level.FINER, "Break signalled, CPAAlgorithm will stop.");
 
           // add the new state
           reachedSet.add(successor, successorPrecision);
+          stats.track("ReachedSet", reachedSet.size(), null);
 
           if (it.hasNext()) {
             // re-add the old state to the waitlist, there are unhandled
@@ -459,8 +362,7 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
       // An optimization, we don't bother merging if we know that the
       // merge operator won't do anything (i.e., it is merge-sep).
       if (mergeOperator != MergeSepOperator.getInstance() && !reached.isEmpty()) {
-        stats.mergeTimer.start();
-        StatEvent mergeTimer = stats2.open("Merge");
+        StatEvent mergeTimer = stats.open("Merge");
         try {
           List<AbstractState> toRemove = new ArrayList<>();
           List<Pair<AbstractState, Precision>> toAdd = new ArrayList<>();
@@ -478,7 +380,6 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
                 logger.log(Level.FINER, "Successor was merged with state from reached set");
                 logger.log(
                     Level.ALL, "Merged", successor, "\nand", reachedState, "\n-->", mergedState);
-                stats.countMerge++;
 
                 toRemove.add(reachedState);
                 toAdd.add(Pair.of(mergedState, successorPrecision));
@@ -489,6 +390,9 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
             // because ARGCPA doesn't like states in toRemove to be in the reachedSet.
             reachedSet.removeAll(toRemove);
             reachedSet.addAll(toAdd);
+            if (!toRemove.isEmpty() || !toAdd.isEmpty()) {
+              stats.track("ReachedSet", reachedSet.size(), null);
+            }
           }
 
           if (mergeOperator instanceof ARGMergeJoinCPAEnabledAnalysis) {
@@ -496,34 +400,29 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
           }
 
         } finally {
-          stats2.close(mergeTimer);
-          stats.mergeTimer.stop();
+          stats.close(mergeTimer);
         }
       }
 
-      StatEvent stopTimer = stats2.open("Stop");
-      stats.stopTimer.start();
+      StatEvent stopTimer = stats.open("Stop");
       boolean stop;
       try {
         stop = stopOperator.stop(successor, reached, successorPrecision);
       } finally {
-        stats2.close(stopTimer);
-        stats.stopTimer.stop();
+        stats.close(stopTimer);
       }
 
       if (stop) {
         logger.log(Level.FINER, "Successor is covered or unreachable, not adding to waitlist");
-        stats.countStop++;
-        stats2.track("stopped");
+        stats.track("stopped");
 
       } else {
         logger.log(Level.FINER, "No need to stop, adding successor to waitlist");
 
-        stats.addTimer.start();
-        StatEvent addTimer = stats2.open("Add");
+        StatEvent addTimer = stats.open("Add");
         reachedSet.add(successor, successorPrecision);
-        stats2.close(addTimer);
-        stats.addTimer.stop();
+        stats.track("ReachedSet", reachedSet.size(), null);
+        stats.close(addTimer);
       }
     }
 
@@ -535,7 +434,6 @@ public class CPAAlgorithm implements Algorithm, StatisticsProvider {
     if (forcedCovering instanceof StatisticsProvider) {
       ((StatisticsProvider)forcedCovering).collectStatistics(pStatsCollection);
     }
-    pStatsCollection.add(stats);
-    stats2.collectStatistics(pStatsCollection);
+    stats.collectStatistics(pStatsCollection);
   }
 }
