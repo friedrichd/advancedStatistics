@@ -25,7 +25,7 @@ import java.util.function.Supplier;
 import org.sosy_lab.cpachecker.core.CPAcheckerResult.Result;
 import org.sosy_lab.cpachecker.core.interfaces.Statistics;
 import org.sosy_lab.cpachecker.core.reachedset.UnmodifiableReachedSet;
-import org.sosy_lab.cpachecker.util.statistics.storage.StatStorage;
+import org.sosy_lab.cpachecker.util.statistics.storage.StatStorageStrategy;
 
 /**
  * Implements {@link Statistics} and therefore can be used to print statistics in the default
@@ -34,18 +34,18 @@ import org.sosy_lab.cpachecker.util.statistics.storage.StatStorage;
 public class BasicStatOutput extends StatOutput implements Statistics {
 
   private final String name;
-  private final StatStorage storage;
+  private final StatStorageStrategy storage;
 
-  public BasicStatOutput(String name, StatStorage baseStorage, Supplier<String> loadTemplate) {
-    super(loadTemplate);
+  public BasicStatOutput(String name, StatStorageStrategy store, Supplier<String> templ) {
+    super(templ);
     this.name = name;
-    this.storage = baseStorage;
+    this.storage = store;
   }
 
-  public BasicStatOutput(String name, StatStorage baseStorage, File templateFile) {
-    super(templateFile);
+  public BasicStatOutput(String name, StatStorageStrategy store, File templFile) {
+    super(templFile);
     this.name = name;
-    this.storage = baseStorage;
+    this.storage = store;
   }
 
   @Override
