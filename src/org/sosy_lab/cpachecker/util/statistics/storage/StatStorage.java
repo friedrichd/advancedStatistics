@@ -43,7 +43,7 @@ import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
  */
 public class StatStorage implements StatStorageStrategy {
 
-  private static final Set<String> methods = ImmutableSet.of("count", "value", "time");
+  private static final Set<String> methods = ImmutableSet.of("count", "value", "time", "raw");
   private static final Set<Class<? extends StatStorageStrategy>> VALUETYPES =
       ImmutableSet.of(NumberStatStorage.class, ObjectStatStorage.class, ListStatStorage.class);
 
@@ -52,15 +52,16 @@ public class StatStorage implements StatStorageStrategy {
   private final Map<String, StatStorage> children =
       Collections.synchronizedMap(new LinkedHashMap<>());
 
-  // storage for duration and value
+  // storage for duration, value and raw
   private StatStorageStrategy storeDuration = null;
+  private StatStorageStrategy storeRaw = null;
   private List<StatStorageStrategy> storeValue = new ArrayList<>();
   // counter for events
   private LongAdder countEvents = new LongAdder();
 
   public void createVariables(Collection<String> variables) {
     for (String path : variables) {
-      if (path.contains("value.")) {
+      if (path.startsWith("value.") || path.contains(".value.")) {
         String[] split = path.split("value\\.", 2);
         if (split.length > 1 && split[1] != null && !split[1].isEmpty()) {
           StatStorage innerNode = getSubStorage(split[0]);
@@ -89,6 +90,11 @@ public class StatStorage implements StatStorageStrategy {
               }
             }
           }
+        }
+      } else if (path.endsWith(".raw") || path.equals("raw")) {
+        StatStorage innerNode = getSubStorage(path.substring(0, path.length() - 3));
+        if (innerNode.storeRaw == null) {
+          innerNode.storeRaw = new CompleteStatStorage();
         }
       }
     }
@@ -120,7 +126,7 @@ public class StatStorage implements StatStorageStrategy {
 
   /**
    * Updates the storage with a new event.
-   * 
+   *
    * @param event The event as a Map&lt;String, Object&gt;
    */
   @Override
@@ -136,6 +142,9 @@ public class StatStorage implements StatStorageStrategy {
             updateValue(entry.getValue());
             break;
         }
+      }
+      if (storeRaw != null) {
+        storeRaw.update(event);
       }
     }
   }
@@ -169,6 +178,8 @@ public class StatStorage implements StatStorageStrategy {
     switch (StatisticsUtils.escape(prefix)) {
       case "count":
         return countEvents.intValue();
+      case "raw":
+        return storeRaw == null ? null : storeRaw.get(rest);
       case "time":
         return storeDuration == null ? null : storeDuration.get(rest);
       case "value":
