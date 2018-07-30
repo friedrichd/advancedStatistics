@@ -155,6 +155,35 @@ public class AdvancedStatistics implements Statistics, StatisticsProvider {
   }
 
   /**
+   * Tracks an event without duration or value and explicitly roots it under the given parent.
+   *
+   * @param label representing the name of the event
+   * @param parent the parent event of this new event, or null for &lt;root&gt;
+   */
+  public StatEvent track(String label, StatEvent parent) {
+    assert baseTime.isRunning() : "Please start tracking before trying to track something!";
+    return new StatEvent(
+        baseTime.elapsed(),
+        (parent == null ? baseStorage : parent.storage).getSubStorage(label)).store(null);
+  }
+
+  /**
+   * Tracks an event without duration, but with some value and explicitly roots it under the given
+   * parent.
+   *
+   * @param label The name of the event
+   * @param value An additional value for categorization of the event
+   * @param parent the parent event of this new event, or null for &lt;root&gt;
+   */
+  public StatEvent track(String label, Object value, StatEvent parent) {
+    assert baseTime.isRunning() : "Please start tracking before trying to track something!";
+    return new StatEvent(
+        baseTime.elapsed(),
+        (parent == null ? baseStorage : parent.storage).getSubStorage(label)).setValue(value)
+            .store(null);
+  }
+
+  /**
    * Opens an event without value.</br>
    * A value can be added either on opening, on closing or not at all.
    *
