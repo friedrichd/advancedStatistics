@@ -60,7 +60,17 @@ public class StatisticsUtils {
    * @param raw A string
    */
   public static String escape(String raw) {
-    return String.join(".", raw.toLowerCase().replaceAll("\\s", "").split("\\.+"));
+    if (raw == null || raw.isEmpty() || raw.equals(".")) {
+      return "";
+    }
+    raw = raw.toLowerCase().replaceAll("\\s", "").replaceAll("\\.+", ".");
+    if (raw.startsWith(".")) {
+      raw = raw.substring(1);
+    }
+    if (raw.endsWith(".")) {
+      raw = raw.substring(0, raw.length() - 1);
+    }
+    return raw;
   }
 
   public static void write(PrintStream target, int indentLevel, int outputNameColWidth,
