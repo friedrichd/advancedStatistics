@@ -45,26 +45,29 @@ import org.sosy_lab.cpachecker.util.statistics.StatisticsUtils;
  */
 public class StatOutput implements StatOutputStrategy {
 
-  private String template;
+  private String template_cache;
+  private final boolean use_cache;
   private final Supplier<String> loadTemplate;
   private final List<Consumer<String>> outWriters = new ArrayList<>();
 
   /** Creates a StatOutputStrategy that uses a string supplier as template. */
-  public StatOutput(Supplier<String> loadTemplate) {
-    this.loadTemplate = loadTemplate;
+  public StatOutput(Supplier<String> templ) {
+    loadTemplate = templ;
+    use_cache = false;
   }
 
   /** Creates a StatOutputStrategy that loads the content of a file as template. */
   public StatOutput(File templateFile) {
     loadTemplate = getSupplierFromFile(templateFile);
+    use_cache = true;
   }
 
   /** Returns the cached template, if available, otherwise calls <code>loadTemplate()</code>. */
   public synchronized String getTemplate() {
-    if (template == null) {
-      template = loadTemplate.get();
+    if (!use_cache || template_cache == null) {
+      template_cache = loadTemplate.get();
     }
-    return template;
+    return template_cache;
   }
 
   @Override
